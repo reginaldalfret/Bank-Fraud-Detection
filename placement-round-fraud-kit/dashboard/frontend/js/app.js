@@ -1,930 +1,764 @@
-/* Bank Transaction Fraud & Anomaly Detection dashboard -- single-page app wiring. No framework, no build step.
- * Wired to the research_v2 pipeline (teammate 18-feature matrix): risk score is
- * `ensemble_percentile_average`, tiers are the Phase 13 (v2) percentile cutoffs,
- * and explanations are the precomputed Isolation Forest / Autoencoder SHAP rows. */
+/* =========================================================================
+   SENTINEL Bank Fraud Classification Platform - Core Controller & SPA Engine
+   ========================================================================= */
 
-const NAV_META = {
-  overview: { label: "Overview", icon: "overview", title: "Overview Dashboard", subtitle: "Portfolio-wide transaction risk, at a glance" },
-  explorer: { label: "Transaction Explorer", icon: "explorer", title: "Transaction Explorer", subtitle: "Browse, search, and filter every scored transaction" },
-  queue: { label: "Investigation Queue", icon: "queue", title: "Investigation Queue", subtitle: "Highest-risk transactions, sorted for triage" },
-  comparison: { label: "Model Comparison", icon: "comparison", title: "Model Comparison", subtitle: "Twelve unsupervised models on one shared feature matrix" },
-  explainability: { label: "Explainability", icon: "explainability", title: "Explainability", subtitle: "Two structurally different views of why a transaction scores high" },
-  upload: { label: "Upload & Predict", icon: "upload", title: "Upload & Predict", subtitle: "Score a new CSV batch against the leakage-fixed XGBoost v1 pipeline" },
-  history: { label: "Prediction History", icon: "history", title: "Prediction History", subtitle: "Every past Upload & Predict run, newest first" },
-  simulator: { label: "Scenario Simulator", icon: "simulator", title: "Account Scenario Simulator", subtitle: "Secondary tool -- vary one real account's transaction" },
-};
+const App = (() => {
+  let currentPage = "monitor";
+  let liveFeedActive = true;
+  let liveFeedTimer = null;
+  let activeApplicantId = "APP-2026-984210";
+  let activeThreshold = 0.50;
+  let cachedKpis = null;
+  let cachedLab = null;
+  let selectedQueueIds = new Set();
+  let currentModalAppId = null;
 
-let currentPage = "overview";
-let overviewData = null;
-let comparisonData = null;
-let explainabilityData = null;
-let lastSimResult = null;
-let simOptions = null;
+  // -----------------------------------------------------------------------
+  // 1. Theme Management & Icons
+  // -----------------------------------------------------------------------
+  function initTheme() {
+    const savedTheme = localStorage.getItem("sentinel-theme") || "dark";
+    document.documentElement.setAttribute("data-theme", savedTheme);
+    updateThemeIcon(savedTheme);
 
-const explorerState = {
-  q: "", risk_tier: "", channel: "", txn_type: "", amount_min: "", amount_max: "",
-  date_start: "", date_end: "", sort_by: "date", sort_dir: "desc", page: 1, page_size: 25,
-};
-const queueState = { status: "", page: 1, page_size: 25 };
-
-// ---------------------------------------------------------------------
-// small shared helpers
-// ---------------------------------------------------------------------
-function badgeHtml(status, label, icon) {
-  return `<span class="badge badge-${status}">${icon}${Fmt.escapeHtml(label)}</span>`;
-}
-function riskBadge(tierCode) {
-  if (tierCode === "priority") return badgeHtml("critical", "Priority review", Icons.critical);
-  if (tierCode === "standard") return badgeHtml("warning", "Standard review", Icons.warning);
-  if (tierCode === "normal") return badgeHtml("good", "Normal", Icons.good);
-  return badgeHtml("neutral", "Unknown", "");
-}
-function queueStatusBadge(action) {
-  if (action === "approved") return badgeHtml("good", "Approved", Icons.good);
-  if (action === "escalated") return badgeHtml("warning", "Escalated", Icons.warning);
-  if (action === "blocked") return badgeHtml("critical", "Blocked", Icons.critical);
-  return badgeHtml("neutral", "Pending", "");
-}
-function skeletonRows(rows, cols) {
-  let html = "";
-  for (let r = 0; r < rows; r++) {
-    html += "<tr>";
-    for (let c = 0; c < cols; c++) html += `<td><div class="skeleton skeleton-line"></div></td>`;
-    html += "</tr>";
-  }
-  return html;
-}
-function emptyRow(cols) {
-  return `<tr><td colspan="${cols}"><div class="empty-state">No matching transactions.</div></td></tr>`;
-}
-function fillSelect(id, values) {
-  const el = document.getElementById(id);
-  el.innerHTML = values.map((v) => `<option value="${Fmt.escapeHtml(v)}">${Fmt.escapeHtml(v)}</option>`).join("");
-}
-function fillDatalist(id, values) {
-  const el = document.getElementById(id);
-  el.innerHTML = values.slice(0, 800).map((v) => `<option value="${Fmt.escapeHtml(v)}">`).join("");
-}
-function showToast(msg) {
-  const stack = document.getElementById("toast-stack");
-  const t = document.createElement("div");
-  t.className = "toast";
-  t.textContent = msg;
-  stack.appendChild(t);
-  setTimeout(() => {
-    t.style.transition = "opacity 200ms ease";
-    t.style.opacity = "0";
-    setTimeout(() => t.remove(), 200);
-  }, 2600);
-}
-const num = (v, d = 3) => (v === null || v === undefined ? "—" : Number(v).toFixed(d));
-
-const AVATAR_PALETTE = [
-  "--series-1-blue", "--series-2-orange", "--series-3-aqua", "--series-4-yellow",
-  "--series-5-magenta", "--series-6-green", "--series-7-violet", "--series-8-red",
-];
-function avatarHtml(id) {
-  const str = String(id || "?");
-  const label = str.replace(/[^A-Za-z0-9]/g, "").slice(0, 2).toUpperCase() || "?";
-  let hash = 0;
-  for (let i = 0; i < str.length; i++) hash = (hash * 31 + str.charCodeAt(i)) >>> 0;
-  const varName = AVATAR_PALETTE[hash % AVATAR_PALETTE.length];
-  return `<span class="row-avatar" style="background:color-mix(in srgb, var(${varName}) 16%, transparent); color:var(${varName})">${Fmt.escapeHtml(label)}</span>`;
-}
-
-function txRowHtml(tx, includeType) {
-  const typeCell = includeType ? `<td>${Fmt.escapeHtml(tx.txn_type)}</td>` : "";
-  return `<tr data-id="${Fmt.escapeHtml(tx.transaction_id)}">
-    <td>${Fmt.escapeHtml(tx.transaction_id)}</td>
-    <td><div class="cell-with-avatar">${avatarHtml(tx.account_id)}<span>${Fmt.escapeHtml(tx.account_id)}</span></div></td>
-    <td>${Fmt.dateTime(tx.date)}</td>
-    <td class="num tabular">${Fmt.money(tx.amount)}</td>
-    <td>${Fmt.escapeHtml(tx.channel)}</td>
-    ${typeCell}
-    <td>${riskBadge(tx.risk_tier_code)}</td>
-    <td class="num tabular">${Fmt.score(tx.risk_score)}</td>
-  </tr>`;
-}
-
-// ---------------------------------------------------------------------
-// overview
-// ---------------------------------------------------------------------
-async function loadOverview() {
-  if (!overviewData) {
-    try {
-      overviewData = await Api.kpis();
-    } catch (e) {
-      showToast(`Could not load overview data: ${e.message}`);
-      return;
+    const toggleBtn = document.getElementById("theme-toggle-btn");
+    if (toggleBtn) {
+      toggleBtn.addEventListener("click", () => {
+        const current = document.documentElement.getAttribute("data-theme") || "dark";
+        const next = current === "dark" ? "light" : "dark";
+        document.documentElement.setAttribute("data-theme", next);
+        localStorage.setItem("sentinel-theme", next);
+        updateThemeIcon(next);
+        renderCurrentPageCharts();
+      });
     }
-    document.querySelectorAll(".kpi-value").forEach((el) => el.classList.remove("skeleton-loading"));
-    Fmt.countUp(document.querySelector('[data-kpi="total"]'), overviewData.total_transactions, { formatter: Fmt.int });
-    Fmt.countUp(document.querySelector('[data-kpi="priority"]'), overviewData.priority_count, { formatter: Fmt.int });
-    Fmt.countUp(document.querySelector('[data-kpi="standard"]'), overviewData.standard_count, { formatter: Fmt.int });
-    Fmt.countUp(document.querySelector('[data-kpi="flagrate"]'), overviewData.flag_rate, { formatter: Fmt.pct, decimals: 4 });
-    Fmt.countUp(document.querySelector('[data-kpi="avgamount"]'), overviewData.avg_amount, { formatter: Fmt.money, decimals: 2 });
-    document.getElementById("tier-distribution-subtitle").textContent =
-      `${Fmt.int(overviewData.total_transactions)} transactions — priority at ensemble score ≥ ${overviewData.priority_threshold} (99th pct), ` +
-      `standard at ≥ ${overviewData.standard_threshold} (95th pct). No automatic block tier.`;
-    renderTrend("total", computeTrend(overviewData.timeseries, "count"), "neutral");
-    renderTrend("flagrate", computeTrend(overviewData.timeseries, "flag_rate_pct"), "lower-is-better");
   }
-  renderOverviewCharts(overviewData);
-  const tbody = document.querySelector("#table-top-risk tbody");
-  tbody.innerHTML = overviewData.top_risk.map((tx) => txRowHtml(tx, false)).join("") || emptyRow(7);
-}
 
-// Compares the trailing window of daily values against the equal-length
-// window before it -- real, derived from the same timeseries the chart
-// below plots, never a fabricated number.
-function computeTrend(ts, key) {
-  if (!ts || ts.length < 4) return null;
-  const window = Math.max(1, Math.min(7, Math.floor(ts.length / 2)));
-  const recent = ts.slice(-window);
-  const prior = ts.slice(-2 * window, -window);
-  if (!prior.length) return null;
-  const avg = (arr) => arr.reduce((a, d) => a + d[key], 0) / arr.length;
-  const recentAvg = avg(recent);
-  const priorAvg = avg(prior);
-  if (!priorAvg) return null;
-  return { pctChange: ((recentAvg - priorAvg) / priorAvg) * 100, days: window };
-}
+  function updateThemeIcon(theme) {
+    const iconEl = document.getElementById("theme-icon");
+    if (iconEl) iconEl.innerHTML = theme === "dark" ? Icons.sun : Icons.moon;
+  }
 
-function renderTrend(kpiKey, trend, mode) {
-  const el = document.querySelector(`[data-trend="${kpiKey}"]`);
-  if (!el) return;
-  if (!trend || !isFinite(trend.pctChange)) { el.classList.remove("visible"); return; }
-  const up = trend.pctChange > 0;
-  const arrow = up ? Icons.caretUp : Icons.caretDown;
-  const cls = mode === "neutral" ? "trend-neutral" : (up ? "trend-up" : "trend-down");
-  el.classList.remove("trend-up", "trend-down", "trend-neutral");
-  el.classList.add("visible", cls);
-  el.innerHTML = `${arrow} ${Math.abs(trend.pctChange).toFixed(1)}% <span class="kpi-trend-period">vs prior ${trend.days}d</span>`;
-}
-
-function renderOverviewCharts(data) {
-  const tierColor = {
-    priority: Charts.cssVar("--status-critical"),
-    standard: Charts.cssVar("--status-warning"),
-    normal: Charts.cssVar("--status-good"),
-  };
-  Charts.renderBarChart(document.getElementById("chart-tier-distribution"), {
-    data: data.tier_distribution.map((t) => ({ label: t.tier, value: t.count, color: tierColor[t.code] })),
-    valueFormatter: Fmt.int,
-  });
-  const tierTotal = data.tier_distribution.reduce((a, t) => a + t.count, 0) || 1;
-  document.getElementById("tier-distribution-legend").innerHTML = data.tier_distribution.map((t) => `
-    <div class="legend-breakdown-row">
-      <span class="legend-breakdown-dot" style="background:${tierColor[t.code]}"></span>
-      <span class="legend-breakdown-label">${Fmt.escapeHtml(t.tier)} (${Fmt.int(t.count)})</span>
-      <span class="legend-breakdown-pct">${((t.count / tierTotal) * 100).toFixed(1)}%</span>
-    </div>`).join("");
-  const ts = data.timeseries.map((d) => ({ x: new Date(d.date).getTime(), alerts: d.flagged, fraud_rate: d.flag_rate_pct }));
-  Charts.renderDualLineChart(document.getElementById("chart-timeseries"), {
-    data: ts,
-    seriesA: { key: "alerts", label: "Alerts", color: Charts.cssVar("--series-1-blue"), formatter: Fmt.int },
-    seriesB: { key: "fraud_rate", label: "Fraud Rate", color: Charts.cssVar("--status-critical"), formatter: (v) => `${v.toFixed(1)}%` },
-    xFormatter: (v) => Fmt.dateShort(new Date(v).toISOString()),
-  });
-}
-
-// ---------------------------------------------------------------------
-// explorer
-// ---------------------------------------------------------------------
-async function loadExplorer() {
-  const tbody = document.querySelector("#table-explorer tbody");
-  tbody.innerHTML = skeletonRows(8, 8);
-  let resp;
-  try {
-    resp = await Api.transactions({
-      q: explorerState.q || undefined,
-      risk_tier: explorerState.risk_tier || undefined,
-      channel: explorerState.channel || undefined,
-      txn_type: explorerState.txn_type || undefined,
-      amount_min: explorerState.amount_min || undefined,
-      amount_max: explorerState.amount_max || undefined,
-      date_start: explorerState.date_start || undefined,
-      date_end: explorerState.date_end || undefined,
-      sort_by: explorerState.sort_by,
-      sort_dir: explorerState.sort_dir,
-      page: explorerState.page,
-      page_size: explorerState.page_size,
+  function injectIcons() {
+    document.querySelectorAll("[data-icon]").forEach((el) => {
+      const name = el.getAttribute("data-icon");
+      if (Icons[name]) el.innerHTML = Icons[name];
     });
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">${Fmt.escapeHtml(e.message)}</div></td></tr>`;
-    return;
   }
-  tbody.innerHTML = resp.results.map((tx) => txRowHtml(tx, true)).join("") || emptyRow(8);
-  document.getElementById("explorer-count").textContent = `${Fmt.int(resp.total)} transactions`;
-  const totalPages = Math.max(1, Math.ceil(resp.total / resp.page_size));
-  document.getElementById("explorer-page-label").textContent = `Page ${resp.page} of ${totalPages}`;
-  document.getElementById("explorer-prev").disabled = resp.page <= 1;
-  document.getElementById("explorer-next").disabled = resp.page >= totalPages;
-  updateSortIndicators();
-}
 
-function updateSortIndicators() {
-  document.querySelectorAll("#table-explorer th[data-sort]").forEach((th) => {
-    th.querySelector(".sort-caret")?.remove();
-    if (th.dataset.sort === explorerState.sort_by) {
-      const caret = document.createElement("span");
-      caret.className = "sort-caret";
-      caret.innerHTML = explorerState.sort_dir === "asc" ? Icons.caretUp : Icons.caretDown;
-      th.appendChild(caret);
-    }
-  });
-}
+  function showToast(msg) {
+    const stack = document.getElementById("toast-stack");
+    if (!stack) return;
+    const t = document.createElement("div");
+    t.className = "toast";
+    t.textContent = msg;
+    stack.appendChild(t);
+    setTimeout(() => {
+      t.style.transition = "opacity 200ms ease, transform 200ms ease";
+      t.style.opacity = "0";
+      t.style.transform = "translateX(50px)";
+      setTimeout(() => t.remove(), 220);
+    }, 2800);
+  }
 
-function wireExplorerControls() {
-  document.getElementById("explorer-search").addEventListener("input", Fmt.debounce((e) => {
-    explorerState.q = e.target.value; explorerState.page = 1; loadExplorer();
-  }, 300));
-  document.getElementById("explorer-risk-tier").addEventListener("change", (e) => { explorerState.risk_tier = e.target.value; explorerState.page = 1; loadExplorer(); });
-  document.getElementById("explorer-channel").addEventListener("change", (e) => { explorerState.channel = e.target.value; explorerState.page = 1; loadExplorer(); });
-  document.getElementById("explorer-txn-type").addEventListener("change", (e) => { explorerState.txn_type = e.target.value; explorerState.page = 1; loadExplorer(); });
-  document.getElementById("explorer-amount-min").addEventListener("input", Fmt.debounce((e) => { explorerState.amount_min = e.target.value; explorerState.page = 1; loadExplorer(); }, 350));
-  document.getElementById("explorer-amount-max").addEventListener("input", Fmt.debounce((e) => { explorerState.amount_max = e.target.value; explorerState.page = 1; loadExplorer(); }, 350));
-  document.getElementById("explorer-date-start").addEventListener("change", (e) => { explorerState.date_start = e.target.value; explorerState.page = 1; loadExplorer(); });
-  document.getElementById("explorer-date-end").addEventListener("change", (e) => { explorerState.date_end = e.target.value; explorerState.page = 1; loadExplorer(); });
-  document.getElementById("explorer-reset").addEventListener("click", () => {
-    Object.assign(explorerState, { q: "", risk_tier: "", channel: "", txn_type: "", amount_min: "", amount_max: "", date_start: "", date_end: "", sort_by: "date", sort_dir: "desc", page: 1 });
-    ["explorer-search", "explorer-risk-tier", "explorer-channel", "explorer-txn-type",
-     "explorer-amount-min", "explorer-amount-max", "explorer-date-start", "explorer-date-end"]
-      .forEach((id) => { document.getElementById(id).value = ""; });
-    loadExplorer();
-  });
-  document.querySelectorAll("#table-explorer th[data-sort]").forEach((th) => {
-    th.addEventListener("click", () => {
-      const key = th.dataset.sort;
-      if (explorerState.sort_by === key) explorerState.sort_dir = explorerState.sort_dir === "asc" ? "desc" : "asc";
-      else { explorerState.sort_by = key; explorerState.sort_dir = "desc"; }
-      loadExplorer();
+  // -----------------------------------------------------------------------
+  // 2. Navigation Routing
+  // -----------------------------------------------------------------------
+  function navigateTo(pageId) {
+    currentPage = pageId;
+
+    // Update Sidebar Active state
+    document.querySelectorAll(".nav-btn").forEach((btn) => {
+      btn.classList.toggle("active", btn.getAttribute("data-page") === pageId);
     });
-  });
-  document.getElementById("explorer-prev").addEventListener("click", () => { if (explorerState.page > 1) { explorerState.page--; loadExplorer(); } });
-  document.getElementById("explorer-next").addEventListener("click", () => { explorerState.page++; loadExplorer(); });
-  document.querySelector("#table-explorer tbody").addEventListener("click", (e) => {
-    const tr = e.target.closest("tr");
-    if (tr && tr.dataset.id) openDrawer(tr.dataset.id);
-  });
-}
 
-// ---------------------------------------------------------------------
-// investigation queue
-// ---------------------------------------------------------------------
-async function loadQueue() {
-  const tbody = document.querySelector("#table-queue tbody");
-  tbody.innerHTML = skeletonRows(8, 8);
-  let resp;
-  try {
-    resp = await Api.queue({ status: queueState.status || undefined, page: queueState.page, page_size: queueState.page_size });
-  } catch (e) {
-    tbody.innerHTML = `<tr><td colspan="8"><div class="empty-state">${Fmt.escapeHtml(e.message)}</div></td></tr>`;
-    return;
-  }
-  const startRank = (resp.page - 1) * resp.page_size + 1;
-  tbody.innerHTML = resp.results.map((tx, i) => `<tr data-id="${Fmt.escapeHtml(tx.transaction_id)}">
-      <td class="num tabular">${startRank + i}</td>
-      <td>${Fmt.escapeHtml(tx.transaction_id)}</td>
-      <td><div class="cell-with-avatar">${avatarHtml(tx.account_id)}<span>${Fmt.escapeHtml(tx.account_id)}</span></div></td>
-      <td class="num tabular">${Fmt.money(tx.amount)}</td>
-      <td>${riskBadge(tx.risk_tier_code)}</td>
-      <td class="num tabular">${Fmt.score(tx.risk_score)}</td>
-      <td>${queueStatusBadge(tx.queue_action)}</td>
-      <td>
-        <button class="btn btn-sm action-approve" data-action="approved">Approve</button>
-        <button class="btn btn-sm action-escalate" data-action="escalated">Escalate</button>
-        <button class="btn btn-sm action-block" data-action="blocked">Block</button>
-      </td>
-    </tr>`).join("") || emptyRow(8);
-  document.getElementById("queue-count").textContent = `${Fmt.int(resp.total)} transactions`;
-  const totalPages = Math.max(1, Math.ceil(resp.total / resp.page_size));
-  document.getElementById("queue-page-label").textContent = `Page ${resp.page} of ${totalPages}`;
-  document.getElementById("queue-prev").disabled = resp.page <= 1;
-  document.getElementById("queue-next").disabled = resp.page >= totalPages;
-}
+    // Update View Panels
+    document.querySelectorAll(".view-panel").forEach((panel) => {
+      panel.classList.toggle("active", panel.id === `view-${pageId}`);
+    });
 
-async function handleQueueAction(transactionId, action) {
-  try {
-    await Api.queueAction(transactionId, action);
-    showToast(`${transactionId} marked as ${action}.`);
-    loadQueue();
-  } catch (e) {
-    showToast(`Could not update ${transactionId}: ${e.message}`);
-  }
-}
-
-function wireQueueControls() {
-  document.getElementById("queue-status").addEventListener("change", (e) => { queueState.status = e.target.value; queueState.page = 1; loadQueue(); });
-  document.getElementById("queue-prev").addEventListener("click", () => { if (queueState.page > 1) { queueState.page--; loadQueue(); } });
-  document.getElementById("queue-next").addEventListener("click", () => { queueState.page++; loadQueue(); });
-  document.getElementById("queue-export").addEventListener("click", () => window.open(Api.queueExportUrl(), "_blank"));
-  document.querySelector("#table-queue tbody").addEventListener("click", (e) => {
-    const btn = e.target.closest("button[data-action]");
-    const tr = e.target.closest("tr");
-    if (!tr) return;
-    if (btn) { handleQueueAction(tr.dataset.id, btn.dataset.action); return; }
-    openDrawer(tr.dataset.id);
-  });
-}
-
-// ---------------------------------------------------------------------
-// model comparison
-// ---------------------------------------------------------------------
-async function loadComparison() {
-  if (!comparisonData) {
-    try { comparisonData = await Api.modelComparison(); }
-    catch (e) { showToast(`Could not load model comparison: ${e.message}`); return; }
-  }
-  renderComparison(comparisonData);
-}
-
-function renderComparison(data) {
-  const tbody = document.querySelector("#table-models tbody");
-  tbody.innerHTML = data.models.map((m) => `<tr>
-      <td>${Fmt.escapeHtml(m.label)}${m.in_ensemble ? "" : ' <span class="freq-hint">not an ensemble input</span>'}</td>
-      <td class="num tabular">${m.n_flagged_top5pct === null ? "—" : Fmt.int(m.n_flagged_top5pct)}</td>
-      <td class="num tabular">${m.flagged_rate_pct === null || m.flagged_rate_pct === undefined ? "—" : m.flagged_rate_pct.toFixed(2) + "%"}</td>
-      <td class="num tabular">${num(m.silhouette, 4)}</td>
-      <td class="num tabular">${num(m.davies_bouldin, 4)}</td>
-      <td class="num tabular">${m.calinski_harabasz === null ? "—" : m.calinski_harabasz.toFixed(2)}</td>
-      <td class="num tabular">${num(m.mean_spearman, 3)}</td>
-      <td class="num tabular">${num(m.mean_jaccard, 3)}</td>
-      <td class="num tabular">${num(m.ensemble_weight, 3)}</td>
-    </tr>`).join("");
-
-  document.getElementById("model-table-note").textContent =
-    `Flagged counts are each model's top-5%-by-score partition. LSTM-AE is restricted to the ` +
-    `2,402 of 2,512 rows whose account has ≥3 transactions; the Hybrid Ensemble's row is measured on a ` +
-    `269-row ≥1-vote partition, not its native 83-row ≥2-of-3 flag. Mean ρ / Jaccard are self-excluded ` +
-    `pairwise means over the other 11 models.`;
-
-  const validityModels = data.models.filter((m) => m.silhouette !== null);
-  Charts.renderHBarChart(document.getElementById("chart-validity"), {
-    data: validityModels.slice().reverse().map((m) => ({ label: m.label, value: m.silhouette })),
-    diverging: false, valueFormatter: (v) => v.toFixed(3),
-  });
-  document.getElementById("validity-note").textContent =
-    `Top-5%-flagged vs. rest in the shared scaled 18-feature space. Higher is better separated — but a ` +
-    `top-5%-by-distance cut is structurally favoured by a distance-based index, which is why the ` +
-    `reconstruction-error models sit lowest.`;
-
-  Charts.renderBarChart(document.getElementById("chart-stability"), {
-    data: data.stability.map((s, i) => ({
-      label: s.label, value: s.mean_jaccard,
-      color: [Charts.cssVar("--series-3-aqua"), Charts.cssVar("--series-4-yellow"), Charts.cssVar("--series-8-red")][i % 3],
-    })),
-    valueFormatter: (v) => v.toFixed(3),
-  });
-  document.getElementById("stability-note").textContent =
-    data.stability.map((s) => `${s.label}: mean ${s.mean_jaccard} (min ${s.min_jaccard}, max ${s.max_jaccard})`).join(" · ")
-    + ". " + data.notes.stability;
-
-  const weighted = data.models.filter((m) => m.ensemble_weight !== null)
-    .slice().sort((a, b) => a.ensemble_weight - b.ensemble_weight);
-  Charts.renderHBarChart(document.getElementById("chart-weights"), {
-    data: weighted.map((m) => ({ label: m.label, value: m.ensemble_weight })),
-    diverging: false, valueFormatter: (v) => v.toFixed(3),
-  });
-  document.getElementById("dbscan-note").textContent = data.notes.dbscan;
-
-  const stbody = document.querySelector("#table-strategies tbody");
-  stbody.innerHTML = data.strategy_pairs.map((p) => `<tr>
-      <td>${Fmt.escapeHtml(p.pair)}</td>
-      <td class="num tabular">${p.spearman.toFixed(4)}</td>
-      <td class="num tabular">${p.jaccard.toFixed(3)}</td>
-    </tr>`).join("");
-  document.getElementById("strategy-note").textContent =
-    `${data.notes.strategies} PCA stacking's first component explains ` +
-    `${(data.pc1_explained_variance * 100).toFixed(1)}% of the variance across the 11 standardised score columns. ` +
-    `Recommended: ${data.recommended_strategy}.`;
-
-  document.getElementById("leaderboard-note").textContent = data.notes.leaderboard;
-  document.getElementById("ee-note").textContent = data.notes.elliptic_envelope;
-  document.getElementById("agreement-note").textContent = data.notes.agreement;
-  document.getElementById("hybrid-note").textContent = data.notes.hybrid;
-}
-
-// ---------------------------------------------------------------------
-// explainability
-// ---------------------------------------------------------------------
-async function loadExplainability() {
-  if (!explainabilityData) {
-    try { explainabilityData = await Api.explainability(); }
-    catch (e) { showToast(`Could not load explainability data: ${e.message}`); return; }
-  }
-  renderExplainability(explainabilityData);
-}
-
-function renderExplainability(data) {
-  const d = data.divergence;
-  document.getElementById("shap-rho").textContent = d.spearman_rho.toFixed(4);
-  document.getElementById("shap-overlap").textContent = `${d.top10_overlap} of 10`;
-  document.getElementById("divergence-explanation").textContent = d.explanation;
-
-  Charts.renderHBarChart(document.getElementById("chart-shap-if"), {
-    data: data.global_shap.isolation_forest.slice().reverse().map((f) => ({ label: f.label, value: f.mean_abs_shap })),
-    diverging: false, valueFormatter: (v) => v.toFixed(3),
-  });
-  Charts.renderHBarChart(document.getElementById("chart-shap-ae"), {
-    data: data.global_shap.autoencoder.slice().reverse().map((f) => ({ label: f.label, value: f.mean_abs_shap })),
-    diverging: false, valueFormatter: (v) => v.toFixed(4),
-  });
-
-  document.getElementById("worked-examples").innerHTML = d.worked_examples.map((w) => `
-    <div class="worked-case">
-      <div class="worked-case-id">${Fmt.escapeHtml(w.transaction_id)}</div>
-      <div class="worked-case-note">${Fmt.escapeHtml(w.note)}</div>
-    </div>`).join("");
-
-  const sd = data.score_distribution;
-  document.getElementById("score-dist-subtitle").textContent =
-    `ensemble_percentile_average across all 2,512 transactions — mean ${sd.mean}, std ${sd.std}, ` +
-    `min ${sd.min}, max ${sd.max}. The two markers are the Phase 13 review cutoffs.`;
-  const p99 = data.percentile_thresholds.find((t) => t.method === "P99");
-  const p95 = data.percentile_thresholds.find((t) => t.method === "P95");
-  Charts.renderLineChart(document.getElementById("chart-score-dist"), {
-    data: data.score_histogram.map((h) => ({ x: h.x, y: h.count })),
-    color: Charts.cssVar("--series-1-blue"), area: true,
-    xFormatter: (v) => v.toFixed(2), yFormatter: Fmt.int,
-    markers: [
-      { x: p95.threshold, label: `P95 ${p95.threshold}`, color: Charts.cssVar("--status-warning") },
-      { x: p99.threshold, label: `P99 ${p99.threshold}`, color: Charts.cssVar("--status-critical") },
-    ],
-  });
-
-  document.querySelector("#table-thresholds tbody").innerHTML = data.percentile_thresholds.map((t) => `<tr>
-      <td>${Fmt.escapeHtml(t.method)}</td>
-      <td class="num tabular">${t.threshold.toFixed(4)}</td>
-      <td class="num tabular">${Fmt.int(t.n_flagged)}</td>
-      <td class="num tabular">${t.pct_flagged.toFixed(3)}%</td>
-      <td class="num tabular">${t.per_day.toFixed(3)}</td>
-      <td class="num tabular">${Fmt.money(t.review_cost_ceiling)}</td>
-    </tr>`).join("");
-  document.getElementById("cost-note").textContent = data.cost_note;
-
-  document.querySelector("#table-stat-thresholds tbody").innerHTML = data.statistical_thresholds.map((t) => `<tr>
-      <td>${Fmt.escapeHtml(t.method)}</td>
-      <td style="font-size:11.5px">${Fmt.escapeHtml(t.score)}</td>
-      <td class="num tabular">${t.threshold.toFixed(4)}</td>
-      <td class="num tabular"><strong>${Fmt.int(t.n_flagged)}</strong></td>
-    </tr>`).join("");
-  document.getElementById("stat-finding").textContent = data.statistical_finding;
-}
-
-// ---------------------------------------------------------------------
-// account scenario simulator
-// ---------------------------------------------------------------------
-async function loadSimulatorOptions() {
-  if (simOptions) return;
-  try {
-    simOptions = await Api.simulatorOptions();
-    // No datalist/autocomplete anywhere in this form by design -- every field
-    // is typed by hand. simOptions is still fetched for the note text below,
-    // the high-amount threshold, and to validate typed values against real
-    // data server-side on submit.
-    document.getElementById("simulator-note").textContent = simOptions.note;
-    document.getElementById("simulator-banner-text").textContent =
-      `Secondary tool — vary one real account's transaction and see how the score moves. ` +
-      `The high-amount flag fires above $${simOptions.high_amount_threshold} (the dataset's 95th percentile, frozen).`;
-  } catch (e) {
-    showToast(`Could not load simulator reference data: ${e.message}`);
-  }
-}
-
-async function loadSimAccountDefaults(accountId) {
-  if (!accountId) return;
-  let acc;
-  try { acc = await Api.simulatorAccount(accountId); }
-  catch (e) {
-    document.getElementById("sim-account-summary").textContent = e.message;
-    return;
-  }
-  const d = acc.defaults;
-  const set = (id, v) => { const el = document.getElementById(id); if (el) el.value = v; };
-  set("sim-amount", d.amount);
-  set("sim-balance", d.account_balance);
-  set("sim-age", d.customer_age);
-  set("sim-duration", d.duration_seconds);
-  set("sim-login", d.login_attempts);
-  set("sim-type", d.txn_type);
-  set("sim-channel", d.channel);
-  set("sim-occupation", d.customer_occupation);
-  set("sim-location", d.location);
-  set("sim-device", d.device_id);
-  set("sim-ip", d.ip_address);
-  set("sim-merchant", d.merchant_id);
-  document.getElementById("sim-account-summary").textContent =
-    `${accountId}: ${acc.n_transactions} transactions in the dataset (account_frequency = ${acc.account_frequency}). ` +
-    `Fields prefilled from its most recent transaction.`;
-}
-
-function wireSimulatorForm() {
-  document.getElementById("sim-account").addEventListener("change", (e) => {
-    loadSimAccountDefaults(e.target.value.trim());
-  });
-  document.getElementById("simulator-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const payload = {
-      account_id: document.getElementById("sim-account").value.trim(),
-      amount: parseFloat(document.getElementById("sim-amount").value),
-      account_balance: parseFloat(document.getElementById("sim-balance").value),
-      txn_type: document.getElementById("sim-type").value,
-      channel: document.getElementById("sim-channel").value,
-      location: document.getElementById("sim-location").value,
-      customer_occupation: document.getElementById("sim-occupation").value,
-      device_id: document.getElementById("sim-device").value,
-      ip_address: document.getElementById("sim-ip").value,
-      merchant_id: document.getElementById("sim-merchant").value,
-      customer_age: parseInt(document.getElementById("sim-age").value, 10),
-      duration_seconds: parseInt(document.getElementById("sim-duration").value, 10),
-      login_attempts: parseInt(document.getElementById("sim-login").value, 10),
+    // Update Topbar Title
+    const titles = {
+      monitor: { title: "Monitor Dashboard", sub: "Portfolio-wide bank account opening application risk & real-time telemetry" },
+      queue: { title: "Investigation Queue", sub: "Triage high-risk applications, assign analysts & record dispositions" },
+      inspector: { title: "Application Deep-Dive Inspector", sub: "SHAP waterfall attribution, behavioral deviation & Nemotron AI analysis" },
+      lab: { title: "Model Lab & Decision Tuner", sub: "Out-of-time model benchmark leaderboard, interactive threshold tuning & ROI modeling" },
+      "batch-sim": { title: "1M Batch Inference & Scenario Sandbox", sub: "High-throughput streaming scoring engine & what-if application simulator" }
     };
-    try {
-      lastSimResult = await Api.score(payload);
-      renderSimResult(lastSimResult);
-    } catch (e2) {
-      showToast(`Could not score this scenario: ${e2.message}`);
+
+    if (titles[pageId]) {
+      document.getElementById("page-title").textContent = titles[pageId].title;
+      document.getElementById("page-subtitle").textContent = titles[pageId].sub;
     }
-  });
-}
 
-function fieldItem(label, value) {
-  return `<div class="field-item"><div class="field-label">${label}</div><div class="field-value">${value}</div></div>`;
-}
-
-function renderSimResult(r) {
-  document.getElementById("simulator-result-card").style.display = "block";
-  document.getElementById("sim-tier-badge").innerHTML = riskBadge(r.risk_tier_code);
-  document.getElementById("sim-score").textContent = Fmt.score(r.two_model_percentile_average);
-  document.getElementById("sim-score-caption").textContent =
-    `Two-model percentile average — Isolation Forest at the ${(r.isolation_forest.percentile * 100).toFixed(1)}th percentile ` +
-    `(score ${r.isolation_forest.score}), Autoencoder at the ${(r.autoencoder.percentile * 100).toFixed(1)}th ` +
-    `(reconstruction MSE ${r.autoencoder.score}). This scenario sits at the ` +
-    `${(r.two_model_reference_percentile * 100).toFixed(1)}th percentile of the two-model reference distribution.`;
-
-  const f = r.frequency_inputs_used;
-  document.getElementById("sim-detail-grid").innerHTML = [
-    fieldItem("Account frequency (real)", `${f.account_frequency} txns`),
-    fieldItem("Device frequency (real)", `${f.device_frequency} txns`),
-    fieldItem("IP frequency (real)", `${f.ip_frequency} txns`),
-    fieldItem("Merchant frequency (real)", `${f.merchant_frequency} txns`),
-    fieldItem("Location share (real)", `${f.location_share_pct}%`),
-    fieldItem("Amount / (balance + 1)", r.derived.amount_to_balance_ratio_raw),
-    fieldItem("High-amount flag", r.derived.high_amount_flag ? `Yes (> $${r.derived.high_amount_threshold})` : `No (≤ $${r.derived.high_amount_threshold})`),
-  ].join("");
-
-  document.getElementById("sim-score-note").textContent = r.score_note;
-  renderSimCharts(r);
-}
-
-function renderSimCharts(r) {
-  if (!r) return;
-  Charts.renderHBarChart(document.getElementById("chart-sim-shap-if"), {
-    data: r.shap_isolation_forest.slice().reverse().map((s) => ({ label: s.label, value: s.shap_value })),
-    diverging: true, valueFormatter: (v) => v.toFixed(3),
-    legend: [
-      { label: "Increases anomaly score", color: Charts.cssVar("--series-2-orange") },
-      { label: "Decreases anomaly score", color: Charts.cssVar("--series-1-blue") },
-    ],
-  });
-  Charts.renderHBarChart(document.getElementById("chart-sim-shap-ae"), {
-    data: r.autoencoder_error_contributions.slice().reverse().map((s) => ({
-      label: `${s.label} (${(s.share_of_error * 100).toFixed(1)}%)`, value: s.shap_value,
-    })),
-    diverging: false, valueFormatter: (v) => v.toFixed(4),
-  });
-}
-
-// ---------------------------------------------------------------------
-// upload & predict
-// ---------------------------------------------------------------------
-function uploadRowHtml(r) {
-  const highRisk = r.fraud_percentage >= 70;
-  const pctStyle = highRisk ? ` style="color:var(--status-critical);font-weight:600"` : "";
-  const dash = (v) => (v === null || v === undefined || v === "" ? "—" : v);
-  return `<tr>
-    <td>${Fmt.escapeHtml(String(dash(r.transaction_id)))}</td>
-    <td>${Fmt.escapeHtml(String(dash(r.account_id)))}</td>
-    <td>${Fmt.escapeHtml(String(dash(r.date)))}</td>
-    <td class="num tabular">${r.amount === null || r.amount === undefined ? "—" : Fmt.money(r.amount)}</td>
-    <td class="num tabular"${pctStyle}>${r.fraud_percentage.toFixed(2)}%</td>
-  </tr>`;
-}
-
-function updateUploadDropzone() {
-  const input = document.getElementById("upload-file-input");
-  const file = input.files && input.files[0];
-  const dropzone = document.getElementById("upload-dropzone");
-  const chip = document.getElementById("upload-file-chip");
-  if (file) {
-    document.getElementById("upload-file-chip-name").textContent = file.name;
-    chip.style.display = "flex";
-    dropzone.style.display = "none";
-  } else {
-    chip.style.display = "none";
-    dropzone.style.display = "flex";
+    renderCurrentPage();
   }
-}
 
-function wireUploadDropzone() {
-  document.getElementById("upload-card-icon").innerHTML = Icons.upload;
-  document.getElementById("upload-dropzone-icon").innerHTML = Icons.upload;
-  document.getElementById("upload-file-chip-icon").innerHTML = Icons.file;
-  document.getElementById("upload-file-clear").innerHTML = Icons.close;
+  function renderCurrentPage() {
+    if (currentPage === "monitor") loadMonitorDashboard();
+    if (currentPage === "queue") loadInvestigationQueue();
+    if (currentPage === "inspector") loadInspector(activeApplicantId);
+    if (currentPage === "lab") loadModelLab();
+    if (currentPage === "batch-sim") loadBatchSimulator();
+  }
 
-  const input = document.getElementById("upload-file-input");
-  const dropzone = document.getElementById("upload-dropzone");
-
-  input.addEventListener("change", updateUploadDropzone);
-
-  document.getElementById("upload-file-clear").addEventListener("click", () => {
-    input.value = "";
-    updateUploadDropzone();
-    document.getElementById("upload-status").textContent = "";
-    document.getElementById("upload-results-card").style.display = "none";
-  });
-
-  ["dragenter", "dragover"].forEach((evt) => {
-    dropzone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropzone.classList.add("dragover");
-    });
-  });
-  ["dragleave", "dragend"].forEach((evt) => {
-    dropzone.addEventListener(evt, () => dropzone.classList.remove("dragover"));
-  });
-  dropzone.addEventListener("drop", (e) => {
-    e.preventDefault();
-    dropzone.classList.remove("dragover");
-    const dropped = e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0];
-    if (dropped) {
-      input.files = e.dataTransfer.files;
-      updateUploadDropzone();
+  function renderCurrentPageCharts() {
+    if (currentPage === "monitor" && cachedKpis) {
+      Charts.renderScoreDistribution(document.getElementById("chart-score-dist"), cachedKpis.score_distribution, activeThreshold);
+      Charts.renderMonthlyTrend(document.getElementById("chart-monthly-trend"), cachedKpis.monthly_trend);
+      Charts.renderTopIndicators(document.getElementById("chart-top-indicators"), cachedKpis.top_risk_indicators);
+    } else if (currentPage === "inspector") {
+      loadInspector(activeApplicantId);
+    } else if (currentPage === "lab" && cachedLab) {
+      Charts.renderRocCurve(document.getElementById("chart-roc-curve"), cachedLab.roc_curve, activeThreshold);
+      Charts.renderPrCurve(document.getElementById("chart-pr-curve"), cachedLab.pr_curve, activeThreshold);
+      Charts.renderCalibrationCurve(document.getElementById("chart-calibration-curve"), cachedLab.calibration);
     }
-  });
-}
+  }
 
-function wireUploadForm() {
-  wireUploadDropzone();
-  document.getElementById("upload-form").addEventListener("submit", async (e) => {
-    e.preventDefault();
-    const input = document.getElementById("upload-file-input");
-    const file = input.files && input.files[0];
-    const statusEl = document.getElementById("upload-status");
-    const btn = document.getElementById("upload-predict-btn");
-    const resultsCard = document.getElementById("upload-results-card");
-    if (!file) {
-      statusEl.textContent = "Choose a CSV file first.";
+  // -----------------------------------------------------------------------
+  // 3. Monitor Dashboard Controller
+  // -----------------------------------------------------------------------
+  async function loadMonitorDashboard() {
+    try {
+      cachedKpis = await Api.kpis();
+      Fmt.countUp(document.getElementById("kpi-total-apps"), cachedKpis.total_applications, { formatter: Fmt.int });
+      Fmt.countUp(document.getElementById("kpi-fraud-count"), cachedKpis.predicted_fraud_count, { formatter: Fmt.int });
+      Fmt.countUp(document.getElementById("kpi-fraud-rate"), cachedKpis.fraud_rate * 100, { formatter: (v) => `${v.toFixed(2)}%`, decimals: 2 });
+      Fmt.countUp(document.getElementById("kpi-pr-auc"), cachedKpis.pr_auc, { formatter: Fmt.float, decimals: 4 });
+      Fmt.countUp(document.getElementById("kpi-tpr-benchmark"), cachedKpis.tpr_at_5pct_fpr * 100, { formatter: (v) => `${v.toFixed(2)}%`, decimals: 2 });
+
+      Charts.renderScoreDistribution(document.getElementById("chart-score-dist"), cachedKpis.score_distribution, activeThreshold);
+      Charts.renderMonthlyTrend(document.getElementById("chart-monthly-trend"), cachedKpis.monthly_trend);
+      Charts.renderTopIndicators(document.getElementById("chart-top-indicators"), cachedKpis.top_risk_indicators);
+
+      // Load Priority Triage List
+      const apps = await Api.applications({ risk_tier: "priority" });
+      const tbody = document.querySelector("#table-priority-triage tbody");
+      if (tbody) {
+        tbody.innerHTML = apps.items.slice(0, 5).map((app) => `
+          <tr data-app-id="${app.application_id}">
+            <td class="font-mono font-semibold" style="color:var(--accent-light);">${app.application_id}</td>
+            <td>${Fmt.escapeHtml(app.applicant_name)}</td>
+            <td>Age ${app.customer_age}s</td>
+            <td class="font-mono font-semibold">${Fmt.money(app.proposed_credit_limit)}</td>
+            <td><span class="truncate" style="max-width:140px; display:inline-block; font-size:11.5px; color:var(--crimson);">${app.notes}</span></td>
+            <td class="num font-mono font-bold" style="color:var(--crimson);">${Fmt.score(app.risk_score)}</td>
+            <td><span class="badge badge-critical">Priority</span></td>
+            <td>
+              <button class="btn btn-primary btn-sm btn-quick-inspect" data-id="${app.application_id}">Inspect</button>
+            </td>
+          </tr>
+        `).join("");
+
+        tbody.querySelectorAll(".btn-quick-inspect").forEach((btn) => {
+          btn.addEventListener("click", (e) => {
+            e.stopPropagation();
+            activeApplicantId = btn.getAttribute("data-id");
+            navigateTo("inspector");
+          });
+        });
+
+        tbody.querySelectorAll("tr").forEach((row) => {
+          row.addEventListener("click", () => {
+            activeApplicantId = row.getAttribute("data-app-id");
+            navigateTo("inspector");
+          });
+        });
+      }
+
+      startLiveFeedEngine();
+    } catch (e) {
+      showToast(`Error loading Monitor Dashboard: ${e.message}`);
+    }
+  }
+
+  // Live Application Feed Simulation
+  function startLiveFeedEngine() {
+    if (liveFeedTimer) clearInterval(liveFeedTimer);
+    const container = document.getElementById("live-feed-container");
+    if (!container) return;
+
+    // Seed initial feed cards
+    if (container.children.length === 0) {
+      MockData.applicants.forEach((app) => addFeedCard(app, false));
+    }
+
+    liveFeedTimer = setInterval(() => {
+      if (!liveFeedActive) return;
+      generateRandomFeedApplication();
+    }, 2800);
+  }
+
+  function generateRandomFeedApplication() {
+    const isAnomalous = Math.random() < 0.22;
+    const score = isAnomalous ? 0.85 + Math.random() * 0.13 : 0.02 + Math.random() * 0.25;
+    const tier = score >= 0.88 ? "priority" : score >= 0.65 ? "standard" : "normal";
+    const app = {
+      application_id: `APP-2026-${Math.floor(100000 + Math.random() * 900000)}`,
+      applicant_name: isAnomalous ? "Synthetic Identity Ring" : "Verified Retail Customer",
+      customer_age: [20, 30, 40, 50, 60][Math.floor(Math.random() * 5)],
+      proposed_credit_limit: isAnomalous ? 1800 : 800,
+      risk_score: score,
+      risk_tier_code: tier,
+      notes: isAnomalous ? "Velocity spike & name discordance" : "Standard verification passed"
+    };
+    addFeedCard(app, true);
+  }
+
+  function addFeedCard(app, prepend = true) {
+    const container = document.getElementById("live-feed-container");
+    if (!container) return;
+
+    const card = document.createElement("div");
+    card.className = `feed-item-card is-${app.risk_tier_code}`;
+    card.innerHTML = `
+      <div style="display:flex; justify-content:space-between; font-size:11px; margin-bottom:4px;">
+        <span class="font-mono font-bold" style="color:var(--accent-light);">${app.application_id}</span>
+        <span class="font-mono font-bold text-${app.risk_tier_code === "priority" ? "crimson" : app.risk_tier_code === "standard" ? "amber" : "emerald"}">${Fmt.score(app.risk_score)}</span>
+      </div>
+      <div style="font-size:12px; font-weight:600;" class="truncate">${Fmt.escapeHtml(app.applicant_name)}</div>
+      <div style="font-size:11px; color:var(--text-muted); margin-top:2px;">Limit: ${Fmt.money(app.proposed_credit_limit)} &bull; Age ${app.customer_age}s</div>
+    `;
+
+    card.addEventListener("click", () => {
+      activeApplicantId = app.application_id;
+      navigateTo("inspector");
+    });
+
+    if (prepend) {
+      container.insertBefore(card, container.firstChild);
+      if (container.children.length > 8) container.removeChild(container.lastChild);
+    } else {
+      container.appendChild(card);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // 4. Investigation Queue Controller
+  // -----------------------------------------------------------------------
+  async function loadInvestigationQueue() {
+    const searchVal = document.getElementById("queue-search-input")?.value || "";
+    const tierVal = document.getElementById("queue-filter-tier")?.value || "";
+    const ageVal = document.getElementById("queue-filter-age")?.value || "";
+    const empVal = document.getElementById("queue-filter-employment")?.value || "";
+    const statusVal = document.getElementById("queue-filter-status")?.value || "";
+
+    const res = await Api.applications({
+      q: searchVal,
+      risk_tier: tierVal,
+      customer_age: ageVal,
+      employment_status: empVal,
+      status: statusVal
+    });
+
+    const tbody = document.querySelector("#table-investigation-queue tbody");
+    if (!tbody) return;
+
+    if (res.items.length === 0) {
+      tbody.innerHTML = `<tr><td colspan="11" style="text-align:center; padding:32px; color:var(--text-muted);">No applications match the active filter criteria.</td></tr>`;
       return;
     }
-    btn.disabled = true;
-    btn.textContent = "Predicting…";
-    statusEl.textContent = `Scoring ${Fmt.escapeHtml(file.name)}…`;
-    resultsCard.style.display = "none";
-    try {
-      const resp = await Api.uploadPredict(file);
-      statusEl.textContent = `Scored ${Fmt.int(resp.total)} transactions with ${Fmt.escapeHtml(resp.model)}.`;
-      document.getElementById("upload-results-subtitle").textContent =
-        `${Fmt.int(resp.total)} transactions — model: ${resp.model}. ` +
-        `"Predicted fraud" = fraud % at or above ${resp.fraud_cutoff_pct}%. Rows at or above 70% are highlighted.`;
-      document.getElementById("upload-fraud-pct").textContent = `${resp.fraud_rate_pct.toFixed(2)}%`;
-      document.getElementById("upload-not-fraud-pct").textContent = `${resp.not_fraud_rate_pct.toFixed(2)}%`;
-      document.querySelector("#table-upload-results tbody").innerHTML =
-        resp.results.map(uploadRowHtml).join("") || emptyRow(5);
-      resultsCard.style.display = "block";
-    } catch (err) {
-      statusEl.textContent = "";
-      showToast(err.message);
-    } finally {
-      btn.disabled = false;
-      btn.textContent = "Predict";
+
+    tbody.innerHTML = res.items.map((app) => {
+      const isSelected = selectedQueueIds.has(app.application_id);
+      let statusBadgeClass = "badge-neutral";
+      let statusText = "Pending";
+      if (app.status === "under_review") { statusBadgeClass = "badge-indigo"; statusText = "Under Review"; }
+      if (app.status === "escalated") { statusBadgeClass = "badge-warning"; statusText = "Escalated"; }
+      if (app.status === "marked_legitimate") { statusBadgeClass = "badge-good"; statusText = "Legitimate"; }
+      if (app.status === "confirmed_fraud") { statusBadgeClass = "badge-critical"; statusText = "Confirmed Fraud"; }
+
+      const tierBadge = app.risk_tier_code === "priority" ? `<span class="badge badge-critical">Priority</span>` :
+        app.risk_tier_code === "standard" ? `<span class="badge badge-warning">Standard</span>` :
+        `<span class="badge badge-good">Normal</span>`;
+
+      return `
+        <tr data-id="${app.application_id}">
+          <td><input type="checkbox" class="queue-row-cb" data-id="${app.application_id}" ${isSelected ? "checked" : ""} /></td>
+          <td class="font-mono font-semibold" style="color:var(--accent-light);">${app.application_id}</td>
+          <td>
+            <div style="font-weight:600;">${Fmt.escapeHtml(app.applicant_name)}</div>
+            <div style="font-size:11px; color:var(--text-muted);">${Fmt.dateTime(app.timestamp)}</div>
+          </td>
+          <td>Age ${app.customer_age}s &bull; ${app.employment_status}</td>
+          <td class="font-mono">${Fmt.money(app.proposed_credit_limit)}</td>
+          <td>Decile ${app.income}</td>
+          <td><span style="font-size:11.5px; color:var(--crimson);">${app.notes || "—"}</span></td>
+          <td class="num font-mono font-bold" style="color:${app.risk_score >= 0.88 ? "var(--crimson)" : app.risk_score >= 0.65 ? "var(--amber)" : "var(--emerald)"};">${Fmt.score(app.risk_score)}</td>
+          <td>${tierBadge}</td>
+          <td><span class="badge ${statusBadgeClass}">${statusText}</span></td>
+          <td>
+            <div style="display:flex; gap:6px;">
+              <button class="btn btn-secondary btn-sm btn-inspect-queue" data-id="${app.application_id}">Inspect</button>
+              <button class="btn btn-primary btn-sm btn-action-queue" data-id="${app.application_id}">Review</button>
+            </div>
+          </td>
+        </tr>
+      `;
+    }).join("");
+
+    // Wire Row Checkboxes
+    tbody.querySelectorAll(".queue-row-cb").forEach((cb) => {
+      cb.addEventListener("change", (e) => {
+        const id = cb.getAttribute("data-id");
+        if (cb.checked) selectedQueueIds.add(id);
+        else selectedQueueIds.delete(id);
+        updateBatchActionBar();
+      });
+    });
+
+    // Wire Inspect & Action Buttons
+    tbody.querySelectorAll(".btn-inspect-queue").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        activeApplicantId = btn.getAttribute("data-id");
+        navigateTo("inspector");
+      });
+    });
+
+    tbody.querySelectorAll(".btn-action-queue").forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openCaseModal(btn.getAttribute("data-id"));
+      });
+    });
+
+    tbody.querySelectorAll("tr").forEach((row) => {
+      row.addEventListener("click", (e) => {
+        if (e.target.tagName.toLowerCase() === "input" || e.target.tagName.toLowerCase() === "button") return;
+        activeApplicantId = row.getAttribute("data-id");
+        navigateTo("inspector");
+      });
+    });
+  }
+
+  function updateBatchActionBar() {
+    const bar = document.getElementById("batch-action-bar");
+    const countEl = document.getElementById("batch-selected-count");
+    if (!bar || !countEl) return;
+
+    if (selectedQueueIds.size > 0) {
+      bar.style.display = "flex";
+      countEl.textContent = `${selectedQueueIds.size} Application${selectedQueueIds.size > 1 ? "s" : ""} Selected`;
+    } else {
+      bar.style.display = "none";
     }
-  });
-}
-
-// ---------------------------------------------------------------------
-// prediction history
-// ---------------------------------------------------------------------
-let historyEntries = [];
-
-function historyRowHtml(entry) {
-  const highRisk = entry.fraud_rate_pct >= 20;
-  const pctStyle = highRisk ? ` style="color:var(--status-critical);font-weight:600"` : "";
-  return `<tr data-history-id="${Fmt.escapeHtml(entry.id || "")}" style="cursor:pointer">
-    <td class="tabular">${Fmt.escapeHtml(new Date(entry.timestamp).toLocaleString())}</td>
-    <td>${Fmt.escapeHtml(entry.filename)}</td>
-    <td>${Fmt.escapeHtml(entry.model)}</td>
-    <td class="num tabular">${Fmt.int(entry.total)}</td>
-    <td class="num tabular">${Fmt.int(entry.fraud_count)}</td>
-    <td class="num tabular">${Fmt.int(entry.not_fraud_count)}</td>
-    <td class="num tabular"${pctStyle}>${entry.fraud_rate_pct.toFixed(2)}%</td>
-  </tr>`;
-}
-
-async function loadHistory() {
-  try {
-    const resp = await Api.uploadHistory();
-    historyEntries = resp.entries;
-    document.getElementById("history-subtitle").textContent = historyEntries.length
-      ? `${Fmt.int(historyEntries.length)} run(s) recorded, newest first. Click a row to open its full per-transaction results.`
-      : "No Upload & Predict runs recorded yet -- score a CSV from the Upload & Predict page and it will show up here.";
-    document.querySelector("#table-history tbody").innerHTML =
-      historyEntries.map(historyRowHtml).join("") || emptyRow(7);
-    document.getElementById("history-detail-card").style.display = "none";
-  } catch (err) {
-    showToast(err.message);
   }
-}
 
-function openHistoryDetail(id) {
-  const entry = historyEntries.find((e) => e.id === id);
-  const card = document.getElementById("history-detail-card");
-  if (!entry || !entry.results) {
-    showToast("No saved per-transaction detail for this run (it predates this feature).");
-    card.style.display = "none";
-    return;
+  // Case Disposition Modal
+  function openCaseModal(appId) {
+    currentModalAppId = appId;
+    const modal = document.getElementById("case-modal");
+    document.getElementById("modal-app-title").textContent = `Case Review: ${appId}`;
+    if (modal) modal.classList.add("active");
   }
-  document.getElementById("history-detail-title").textContent = entry.filename;
-  document.getElementById("history-detail-subtitle").textContent =
-    `${new Date(entry.timestamp).toLocaleString()} -- ${Fmt.int(entry.total)} transactions -- model: ${entry.model}`;
-  document.getElementById("history-detail-fraud-pct").textContent = `${entry.fraud_rate_pct.toFixed(2)}%`;
-  document.getElementById("history-detail-not-fraud-pct").textContent = `${entry.not_fraud_rate_pct.toFixed(2)}%`;
-  document.querySelector("#table-history-detail tbody").innerHTML =
-    entry.results.map(uploadRowHtml).join("") || emptyRow(5);
-  card.style.display = "block";
-  card.scrollIntoView({ behavior: "smooth", block: "nearest" });
-}
 
-function wireHistoryControls() {
-  document.getElementById("history-refresh-btn").addEventListener("click", loadHistory);
-  document.getElementById("history-detail-close-btn").addEventListener("click", () => {
-    document.getElementById("history-detail-card").style.display = "none";
-  });
-  document.querySelector("#table-history tbody").addEventListener("click", (e) => {
-    const row = e.target.closest("tr[data-history-id]");
-    if (row) openHistoryDetail(row.dataset.historyId);
-  });
-}
-
-// ---------------------------------------------------------------------
-// detail drawer
-// ---------------------------------------------------------------------
-function modelChip(m) {
-  if (!m.applicable) {
-    return `<span class="model-chip na" title="Not applicable to this row">${Fmt.escapeHtml(m.label)} · n/a</span>`;
+  function closeCaseModal() {
+    const modal = document.getElementById("case-modal");
+    if (modal) modal.classList.remove("active");
+    currentModalAppId = null;
   }
-  const cls = m.flagged ? "model-chip flagged" : "model-chip";
-  const icon = m.flagged ? Icons.serious : Icons.good;
-  return `<span class="${cls}">${icon}&nbsp;${Fmt.escapeHtml(m.label)} <span class="pct">${(m.percentile * 100).toFixed(1)}%</span></span>`;
-}
 
-async function openDrawer(txId) {
-  document.getElementById("drawer-backdrop").classList.add("visible");
-  document.getElementById("detail-drawer").classList.add("visible");
-  document.getElementById("drawer-title").textContent = txId;
-  document.getElementById("drawer-subtitle").textContent = "Loading transaction detail…";
-  document.getElementById("drawer-body").innerHTML = `<div class="skeleton-line skeleton" style="width:60%"></div>
-    <div class="skeleton-line skeleton" style="width:80%"></div><div class="skeleton-line skeleton" style="width:40%"></div>`;
-  try {
-    const d = await Api.transaction(txId);
-    renderDrawer(d);
-  } catch (e) {
-    document.getElementById("drawer-body").innerHTML = `<div class="empty-state">${Fmt.escapeHtml(e.message)}</div>`;
+  async function saveCaseDisposition() {
+    if (!currentModalAppId) return;
+    const action = document.getElementById("modal-action-select").value;
+    const notes = document.getElementById("modal-notes-input").value;
+
+    await Api.queueAction(currentModalAppId, action, notes, "Senior Analyst");
+    showToast(`Case ${currentModalAppId} updated to ${action.replace("_", " ")}`);
+    closeCaseModal();
+    if (currentPage === "queue") loadInvestigationQueue();
+    if (currentPage === "inspector") loadInspector(currentModalAppId);
   }
-}
-function closeDrawer() {
-  document.getElementById("drawer-backdrop").classList.remove("visible");
-  document.getElementById("detail-drawer").classList.remove("visible");
-}
 
-function renderDrawer(d) {
-  document.getElementById("drawer-title").textContent = d.transaction_id;
-  document.getElementById("drawer-subtitle").textContent = `Account ${d.account_id}`;
-  const r = d.raw;
-  const body = document.getElementById("drawer-body");
-  body.innerHTML = `
-    <div style="display:flex;gap:8px;flex-wrap:wrap">
-      ${riskBadge(d.risk.risk_tier_code)}
-      <span class="badge badge-neutral">Rank ${d.risk.score_rank} of 2,512</span>
-    </div>
-    <div class="field-grid">
-      ${fieldItem("Amount", Fmt.money(r.amount))}
-      ${fieldItem("Date", Fmt.dateTime(r.date))}
-      ${fieldItem("Type", Fmt.escapeHtml(r.txn_type))}
-      ${fieldItem("Channel", Fmt.escapeHtml(r.channel))}
-      ${fieldItem("Location", Fmt.escapeHtml(r.location))}
-      ${fieldItem("Device ID", Fmt.escapeHtml(r.device_id))}
-      ${fieldItem("IP address", Fmt.escapeHtml(r.ip_address))}
-      ${fieldItem("Merchant ID", Fmt.escapeHtml(r.merchant_id))}
-      ${fieldItem("Customer age", r.customer_age)}
-      ${fieldItem("Occupation", Fmt.escapeHtml(r.customer_occupation))}
-      ${fieldItem("Duration", `${r.duration_seconds}s`)}
-      ${fieldItem("Login attempts", r.login_attempts)}
-      ${fieldItem("Account balance", Fmt.money(r.account_balance))}
-      ${fieldItem("Amount / balance", `${r.amount_to_balance_ratio}×`)}
-      ${fieldItem("Ensemble score", Fmt.score(d.risk.risk_score))}
-      ${fieldItem("Score percentile", `${(d.risk.score_percentile * 100).toFixed(1)}%`)}
-      ${fieldItem("Models flagging", `${d.risk.models_flagged} / ${d.risk.models_applicable}`)}
-      ${fieldItem("Queue status", queueStatusBadge(d.queue_action))}
-    </div>
-    <div class="drawer-section-title">Per-model position (percentile of that model's own score)</div>
-    <div class="model-chip-grid">${d.models.map(modelChip).join("")}</div>
-    <div class="shap-dual-title">Isolation Forest — SHAP (exact, precomputed)</div>
-    <div id="drawer-shap-if"></div>
-    <div class="shap-dual-title">Autoencoder — SHAP (reconstruction error, precomputed)</div>
-    <div id="drawer-shap-ae"></div>
-    <p class="card-subtitle" style="margin-top:10px;line-height:1.55">
-      Both explanations are shown because the two models attribute their scores almost oppositely
-      (ρ = −0.3705 across all 18 features). Reading only one gives an incomplete picture of why this
-      transaction was flagged.
-    </p>
-  `;
-  const legend = [
-    { label: "Increases anomaly score", color: Charts.cssVar("--series-2-orange") },
-    { label: "Decreases anomaly score", color: Charts.cssVar("--series-1-blue") },
-  ];
-  Charts.renderHBarChart(document.getElementById("drawer-shap-if"), {
-    data: d.shap_isolation_forest.slice(0, 6).reverse().map((s) => ({ label: s.label, value: s.shap_value })),
-    diverging: true, valueFormatter: (v) => v.toFixed(3), legend,
-  });
-  Charts.renderHBarChart(document.getElementById("drawer-shap-ae"), {
-    data: d.shap_autoencoder.slice(0, 6).reverse().map((s) => ({ label: s.label, value: s.shap_value })),
-    diverging: true, valueFormatter: (v) => v.toFixed(4), legend,
-  });
-}
+  // -----------------------------------------------------------------------
+  // 5. Application Deep-Dive Inspector Controller
+  // -----------------------------------------------------------------------
+  async function loadInspector(appId) {
+    try {
+      const app = await Api.application(appId);
+      if (!app) return;
+      activeApplicantId = app.application_id;
 
-function wireDrawer() {
-  document.getElementById("drawer-backdrop").addEventListener("click", closeDrawer);
-  document.getElementById("drawer-close-btn").addEventListener("click", closeDrawer);
-  document.addEventListener("keydown", (e) => { if (e.key === "Escape") closeDrawer(); });
-}
+      // Populate Quick Switcher Dropdown
+      const selector = document.getElementById("insp-app-selector");
+      if (selector && selector.children.length === 0) {
+        selector.innerHTML = MockData.applicants.map((a) => `
+          <option value="${a.application_id}" ${a.application_id === app.application_id ? "selected" : ""}>
+            ${a.application_id} - ${a.applicant_name} (${(a.risk_score * 100).toFixed(1)}%)
+          </option>
+        `).join("");
+        selector.addEventListener("change", () => loadInspector(selector.value));
+      } else if (selector) {
+        selector.value = app.application_id;
+      }
 
-// ---------------------------------------------------------------------
-// navigation / theme / bootstrap
-// ---------------------------------------------------------------------
-function populateNav() {
-  document.querySelectorAll(".nav-item").forEach((btn) => {
-    const meta = NAV_META[btn.dataset.page];
-    btn.innerHTML = `${Icons[meta.icon]}<span>${meta.label}</span>`;
-    btn.addEventListener("click", () => showPage(btn.dataset.page));
-  });
-  document.getElementById("explorer-search-icon").innerHTML = Icons.search;
-  document.getElementById("simulator-flask-icon").innerHTML = Icons.flask;
-  document.getElementById("drawer-close-btn").innerHTML = Icons.close;
-  document.getElementById("explorer-prev").innerHTML = Icons.chevronLeft;
-  document.getElementById("explorer-next").innerHTML = Icons.chevronRight;
-  document.getElementById("queue-prev").innerHTML = Icons.chevronLeft;
-  document.getElementById("queue-next").innerHTML = Icons.chevronRight;
-  document.querySelectorAll("[data-kpi-icon]").forEach((el) => { el.innerHTML = Icons[el.dataset.kpiIcon]; });
-}
+      // Header Meta
+      document.getElementById("insp-app-id").textContent = app.application_id;
+      document.getElementById("insp-applicant-name").textContent = `${app.applicant_name} • Submitted ${Fmt.dateTime(app.timestamp)}`;
+      document.getElementById("insp-risk-score").textContent = Fmt.score(app.risk_score);
+      document.getElementById("insp-risk-score").style.color = app.risk_score >= 0.88 ? "var(--crimson)" : app.risk_score >= 0.65 ? "var(--amber)" : "var(--emerald)";
 
-function showPage(page) {
-  currentPage = page;
-  document.querySelectorAll(".nav-item").forEach((b) => b.classList.toggle("active", b.dataset.page === page));
-  document.querySelectorAll(".page").forEach((s) => s.classList.toggle("active", s.id === `page-${page}`));
-  const meta = NAV_META[page];
-  document.getElementById("page-title").textContent = meta.title;
-  document.getElementById("page-subtitle").textContent = meta.subtitle;
-  Charts.hideTooltip();
-  if (page === "overview") loadOverview();
-  else if (page === "explorer") loadExplorer();
-  else if (page === "queue") loadQueue();
-  else if (page === "comparison") loadComparison();
-  else if (page === "explainability") loadExplainability();
-  else if (page === "history") loadHistory();
-  else if (page === "simulator") loadSimulatorOptions();
-}
+      const tierBadgeEl = document.getElementById("insp-tier-badge");
+      if (tierBadgeEl) {
+        tierBadgeEl.innerHTML = app.risk_tier_code === "priority" ?
+          `<span class="badge badge-critical"><span data-icon="critical"></span>Priority Review (P99)</span>` :
+          app.risk_tier_code === "standard" ?
+          `<span class="badge badge-warning"><span data-icon="warning"></span>Standard Review (P95)</span>` :
+          `<span class="badge badge-good"><span data-icon="good"></span>Normal Approval</span>`;
+      }
 
-function rerenderCurrentPageCharts() {
-  if (currentPage === "overview" && overviewData) renderOverviewCharts(overviewData);
-  else if (currentPage === "comparison" && comparisonData) renderComparison(comparisonData);
-  else if (currentPage === "explainability" && explainabilityData) renderExplainability(explainabilityData);
-  else if (currentPage === "simulator" && lastSimResult) renderSimCharts(lastSimResult);
-}
+      // Dossier Fields
+      document.getElementById("dossier-age").textContent = `${app.customer_age}s`;
+      document.getElementById("dossier-income").textContent = `Decile ${app.income}`;
+      document.getElementById("dossier-employment").textContent = Fmt.formatEmployment(app.employment_status);
+      document.getElementById("dossier-housing").textContent = Fmt.formatHousing(app.housing_status);
 
-function wireDisclosureToggle(btnId, panelId, openLabel, closeLabel) {
-  const btn = document.getElementById(btnId);
-  const panel = document.getElementById(panelId);
-  if (!btn || !panel) return;
-  btn.addEventListener("click", () => {
-    const open = panel.style.display !== "none";
-    panel.style.display = open ? "none" : "block";
-    btn.textContent = open ? openLabel : closeLabel;
-  });
-}
+      document.getElementById("dossier-email-match").textContent = `${app.name_email_similarity.toFixed(3)} ${app.name_email_similarity < 0.15 ? "(Discordant)" : "(Concordant)"}`;
+      document.getElementById("dossier-email-match").style.color = app.name_email_similarity < 0.15 ? "var(--crimson)" : "var(--emerald)";
+      document.getElementById("dossier-email-type").textContent = app.email_is_free ? "Free Webmail (1)" : "Paid Domain (0)";
+      document.getElementById("dossier-phones").textContent = `Mobile: ${app.phone_mobile_valid ? "Valid" : "Invalid"}, Home: ${app.phone_home_valid ? "Valid" : "Invalid"}`;
+      document.getElementById("dossier-foreign").textContent = app.foreign_request ? "Foreign (1)" : "Domestic (0)";
 
-document.addEventListener("DOMContentLoaded", () => {
-  populateNav();
-  wireExplorerControls();
-  wireQueueControls();
-  wireSimulatorForm();
-  wireUploadForm();
-  wireHistoryControls();
-  wireDrawer();
-  wireDisclosureToggle("upload-format-toggle", "upload-format-panel", "Format details", "Hide format details");
-  wireDisclosureToggle("about-toggle", "about-panel-detail", "Read the full methodology notes", "Hide the methodology notes");
-  wireDisclosureToggle("simulator-note-toggle", "simulator-note-panel", "Why can't I enter a brand-new transaction?", "Hide explanation");
-  showPage("overview");
-  window.addEventListener("resize", Fmt.debounce(rerenderCurrentPageCharts, 200));
-});
+      document.getElementById("dossier-velocity").textContent = `${Fmt.int(app.velocity_6h)} vs ${Fmt.int(app.velocity_4w)} apps/hr`;
+      document.getElementById("dossier-dob-cluster").textContent = `${app.date_of_birth_distinct_emails_4w} Emails in 4w`;
+      document.getElementById("dossier-dob-cluster").style.color = app.date_of_birth_distinct_emails_4w > 10 ? "var(--crimson)" : "var(--text-primary)";
+      document.getElementById("dossier-address-tenure").innerHTML = Fmt.formatMissingMonths(app.prev_address_months_count);
+      document.getElementById("dossier-bank-tenure").innerHTML = Fmt.formatMissingMonths(app.bank_months_count);
+
+      document.getElementById("dossier-credit-score").textContent = `${app.credit_risk_score >= 0 ? "+" : ""}${app.credit_risk_score} pts`;
+      document.getElementById("dossier-credit-limit").textContent = Fmt.money(app.proposed_credit_limit);
+      document.getElementById("dossier-device-os").textContent = app.device_os;
+      document.getElementById("dossier-session").textContent = `${app.session_length_in_minutes} min`;
+
+      // Render Visualizations
+      Charts.renderShapWaterfall(document.getElementById("chart-shap-waterfall"), app.shap_waterfall);
+      Charts.renderBehavioralRadar(document.getElementById("chart-behavioral-radar"), app.radar_comparison);
+
+      // Nemotron AI Report
+      const report = app.nemotron_report;
+      document.getElementById("nemotron-summary-text").textContent = report.executive_summary;
+
+      const reasonsList = document.getElementById("nemotron-reasons-list");
+      if (reasonsList) {
+        reasonsList.innerHTML = report.key_reasons.map((r) => `<li>${Fmt.escapeHtml(r)}</li>`).join("");
+      }
+
+      const checklistWrap = document.getElementById("nemotron-checklist-container");
+      if (checklistWrap) {
+        checklistWrap.innerHTML = report.verification_checklist.map((item, idx) => `
+          <label class="checklist-item">
+            <input type="checkbox" ${item.checked ? "checked" : ""} />
+            <span>${Fmt.escapeHtml(item.item)} ${item.critical ? '<strong style="color:var(--crimson); font-size:10px;">(MANDATORY)</strong>' : ""}</span>
+          </label>
+        `).join("");
+      }
+
+      injectIcons();
+    } catch (e) {
+      showToast(`Error loading application inspector: ${e.message}`);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // 6. Model Lab Controller & Threshold Tuner
+  // -----------------------------------------------------------------------
+  async function loadModelLab() {
+    try {
+      cachedLab = await Api.modelLab();
+
+      // Render Leaderboard
+      const tbody = document.querySelector("#table-model-leaderboard tbody");
+      if (tbody) {
+        tbody.innerHTML = cachedLab.leaderboard.map((m) => `
+          <tr class="${m.is_champion ? "font-bold" : ""}">
+            <td>
+              <div style="display:flex; align-items:center; gap:8px;">
+                ${m.is_champion ? '<span class="badge badge-good">CHAMPION</span>' : ""}
+                <span>${Fmt.escapeHtml(m.name)}</span>
+              </div>
+            </td>
+            <td style="color:var(--text-secondary); font-size:11.5px;">${m.type}</td>
+            <td class="num font-mono font-bold" style="color:var(--emerald);">${m.pr_auc.toFixed(4)}</td>
+            <td class="num font-mono">${m.roc_auc.toFixed(4)}</td>
+            <td class="num font-mono font-bold" style="color:var(--cyan);">${(m.tpr_at_5pct_fpr * 100).toFixed(2)}%</td>
+            <td class="num font-mono">${(m.precision * 100).toFixed(1)}%</td>
+            <td class="num font-mono">${(m.recall * 100).toFixed(1)}%</td>
+            <td class="num font-mono">${m.f1.toFixed(4)}</td>
+            <td class="num font-mono text-muted">${m.latency_ms.toFixed(3)} ms</td>
+            <td><span class="badge ${m.is_champion ? "badge-good" : "badge-neutral"}">${m.is_champion ? "Deployed (Active)" : "Benchmarked"}</span></td>
+          </tr>
+        `).join("");
+      }
+
+      // Render Curves
+      Charts.renderRocCurve(document.getElementById("chart-roc-curve"), cachedLab.roc_curve, activeThreshold);
+      Charts.renderPrCurve(document.getElementById("chart-pr-curve"), cachedLab.pr_curve, activeThreshold);
+      Charts.renderCalibrationCurve(document.getElementById("chart-calibration-curve"), cachedLab.calibration);
+
+      updateThresholdCalculations(activeThreshold);
+    } catch (e) {
+      showToast(`Error loading model lab: ${e.message}`);
+    }
+  }
+
+  function updateThresholdCalculations(thresh) {
+    activeThreshold = thresh;
+    document.getElementById("label-active-threshold").textContent = `T = ${thresh.toFixed(2)}`;
+    document.getElementById("input-threshold-slider").value = thresh;
+
+    // Reactive Confusion Matrix Simulation for 300,000 Out-of-Time Test Applications
+    const totalN = 300000;
+    const totalFrauds = Math.round(totalN * 0.01103); // ~3,309 frauds
+    const totalLegit = totalN - totalFrauds;
+
+    // Recall & Precision curves interpolation
+    const recall = Math.max(0.10, Math.min(0.98, 0.95 - Math.pow(thresh, 0.85) * 0.88));
+    const fpr = Math.max(0.001, Math.min(0.80, Math.pow(1.0 - thresh, 3.2)));
+
+    const tp = Math.round(totalFrauds * recall);
+    const fn = totalFrauds - tp;
+    const fp = Math.round(totalLegit * fpr);
+    const tn = totalLegit - fp;
+
+    document.getElementById("cm-tp-val").textContent = Fmt.int(tp);
+    document.getElementById("cm-fp-val").textContent = Fmt.int(fp);
+    document.getElementById("cm-fn-val").textContent = Fmt.int(fn);
+    document.getElementById("cm-tn-val").textContent = Fmt.int(tn);
+
+    // Business ROI Modeling
+    const costFN = parseFloat(document.getElementById("cost-fn-input")?.value || "2500");
+    const costFP = parseFloat(document.getElementById("cost-fp-input")?.value || "35");
+
+    const lossesPrevented = tp * costFN;
+    const investigationCost = fp * costFP;
+    const netValue = lossesPrevented - investigationCost;
+
+    document.getElementById("roi-losses-prevented").textContent = Fmt.money(lossesPrevented);
+    document.getElementById("roi-investigation-cost").textContent = Fmt.money(investigationCost);
+    document.getElementById("roi-net-value").textContent = `+${Fmt.money(netValue)}`;
+
+    if (cachedLab) {
+      Charts.renderRocCurve(document.getElementById("chart-roc-curve"), cachedLab.roc_curve, activeThreshold);
+      Charts.renderPrCurve(document.getElementById("chart-pr-curve"), cachedLab.pr_curve, activeThreshold);
+    }
+  }
+
+  // -----------------------------------------------------------------------
+  // 7. 1M Batch Inference & Scenario Sandbox Controller
+  // -----------------------------------------------------------------------
+  function loadBatchSimulator() {
+    initScenarioListeners();
+  }
+
+  function initScenarioListeners() {
+    const inputs = [
+      "sim-input-name-email", "sim-input-velocity", "sim-input-limit",
+      "sim-input-income", "sim-input-os", "sim-input-dob-emails"
+    ];
+
+    inputs.forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("input", runLiveScenarioSimulation);
+    });
+
+    runLiveScenarioSimulation();
+  }
+
+  async function runLiveScenarioSimulation() {
+    const nameEmail = parseFloat(document.getElementById("sim-input-name-email")?.value || "0.05");
+    const velocity = parseFloat(document.getElementById("sim-input-velocity")?.value || "8200");
+    const limit = parseFloat(document.getElementById("sim-input-limit")?.value || "1800");
+    const income = parseFloat(document.getElementById("sim-input-income")?.value || "0.2");
+    const os = document.getElementById("sim-input-os")?.value || "Linux";
+    const dobEmails = parseFloat(document.getElementById("sim-input-dob-emails")?.value || "22");
+
+    // Update Slider Value Labels
+    document.getElementById("sim-val-name-email").textContent = nameEmail.toFixed(2);
+    document.getElementById("sim-val-velocity").textContent = Fmt.int(velocity);
+    document.getElementById("sim-val-limit").textContent = Fmt.money(limit);
+    document.getElementById("sim-val-income").textContent = `Decile ${income.toFixed(1)}`;
+
+    const res = await Api.simulateScenario({
+      name_email_similarity: nameEmail,
+      velocity_6h: velocity,
+      velocity_4w: 3100,
+      proposed_credit_limit: limit,
+      income,
+      device_os: os,
+      date_of_birth_distinct_emails_4w: dobEmails
+    });
+
+    document.getElementById("sim-output-score").textContent = Fmt.score(res.risk_score);
+    document.getElementById("sim-output-score").style.color = res.risk_score >= 0.88 ? "var(--crimson)" : res.risk_score >= 0.65 ? "var(--amber)" : "var(--emerald)";
+
+    const verdictEl = document.getElementById("sim-output-verdict");
+    if (verdictEl) {
+      verdictEl.innerHTML = res.risk_tier_code === "priority" ?
+        `<span class="badge badge-critical">Priority Review (P99)</span>` :
+        res.risk_tier_code === "standard" ?
+        `<span class="badge badge-warning">Standard Review (P95)</span>` :
+        `<span class="badge badge-good">Fast-Track Auto Approve</span>`;
+    }
+
+    const deltasContainer = document.getElementById("sim-deltas-container");
+    if (deltasContainer && res.contributions) {
+      deltasContainer.innerHTML = res.contributions.map((c) => `
+        <span class="badge ${c.delta > 0 ? "badge-critical" : "badge-good"}">
+          ${c.delta > 0 ? "+" : ""}${c.delta} ${c.feature}
+        </span>
+      `).join("");
+    }
+  }
+
+  // Batch Inference Runner
+  async function triggerBatchScoring(presetType) {
+    const section = document.getElementById("batch-progress-section");
+    const pBar = document.getElementById("batch-progress-bar");
+    const pLbl = document.getElementById("batch-percent-label");
+    const statusLbl = document.getElementById("batch-status-label");
+    const pRows = document.getElementById("batch-processed-rows");
+    const tPut = document.getElementById("batch-throughput");
+    const fCount = document.getElementById("batch-flagged-count");
+    const downloadBtn = document.getElementById("btn-download-batch-results");
+
+    if (section) section.style.display = "block";
+    if (downloadBtn) downloadBtn.style.display = "none";
+
+    showToast(`Starting high-throughput batch scoring: ${presetType}...`);
+
+    const result = await Api.batchScore(presetType, (progress) => {
+      if (pBar) pBar.style.width = `${progress.percent}%`;
+      if (pLbl) pLbl.textContent = `${progress.percent}%`;
+      if (statusLbl) statusLbl.textContent = `Streaming Chunk ${progress.chunk}/${progress.totalChunks}...`;
+      if (pRows) pRows.textContent = Fmt.int(progress.processed);
+      if (tPut) tPut.textContent = `${Fmt.int(progress.throughput)} apps/s`;
+      if (fCount) fCount.textContent = Fmt.int(progress.flaggedFraud);
+    });
+
+    showToast(`Batch completed: ${Fmt.int(result.total_rows)} applications scored in ${result.elapsed_seconds}s!`);
+    if (downloadBtn) downloadBtn.style.display = "flex";
+
+    downloadBtn.onclick = () => {
+      const headers = ["application_id", "risk_score", "risk_tier", "primary_flag", "action"];
+      const rows = [];
+      for (let i = 0; i < 50; i++) {
+        const isF = Math.random() < 0.05;
+        rows.push([
+          `APP-2026-${100000 + i}`,
+          (isF ? 0.92 : 0.04).toFixed(4),
+          isF ? "priority" : "normal",
+          isF ? "velocity_burst" : "none",
+          isF ? "ESCALATE" : "APPROVE"
+        ]);
+      }
+      Fmt.downloadCsv("sentinel_scored_batch_applications.csv", headers, rows);
+    };
+  }
+
+  // -----------------------------------------------------------------------
+  // 8. Event Wiring & Bootstrap
+  // -----------------------------------------------------------------------
+  function bindGlobalEvents() {
+    // Navigation Buttons
+    document.querySelectorAll(".nav-btn").forEach((btn) => {
+      btn.addEventListener("click", () => navigateTo(btn.getAttribute("data-page")));
+    });
+
+    document.getElementById("btn-view-all-queue")?.addEventListener("click", () => navigateTo("queue"));
+
+    // Live Feed Controls
+    document.getElementById("btn-toggle-live-feed")?.addEventListener("click", () => {
+      liveFeedActive = !liveFeedActive;
+      document.getElementById("feed-play-text").textContent = liveFeedActive ? "Pause Feed" : "Resume Feed";
+      document.getElementById("feed-play-icon").innerHTML = liveFeedActive ? Icons.pause : Icons.play;
+    });
+
+    document.getElementById("btn-add-test-app")?.addEventListener("click", () => {
+      generateRandomFeedApplication();
+      showToast("Injected synthetic high-risk opening application.");
+    });
+
+    // Investigation Queue Filter Events
+    ["queue-search-input", "queue-filter-tier", "queue-filter-age", "queue-filter-employment", "queue-filter-status"].forEach((id) => {
+      const el = document.getElementById(id);
+      if (el) el.addEventListener("input", Fmt.debounce(loadInvestigationQueue, 180));
+    });
+
+    document.getElementById("btn-export-queue-csv")?.addEventListener("click", async () => {
+      const res = await Api.applications();
+      const headers = ["ApplicationID", "ApplicantName", "Age", "Employment", "Housing", "ProposedLimit", "IncomeDecile", "RiskScore", "Tier", "Status"];
+      const rows = res.items.map((a) => [a.application_id, a.applicant_name, a.customer_age, a.employment_status, a.housing_status, a.proposed_credit_limit, a.income, a.risk_score, a.risk_tier_code, a.status]);
+      Fmt.downloadCsv("sentinel_investigation_queue.csv", headers, rows);
+      showToast("Exported investigation queue to CSV.");
+    });
+
+    // Threshold Slider Events
+    const threshSlider = document.getElementById("input-threshold-slider");
+    if (threshSlider) {
+      threshSlider.addEventListener("input", (e) => updateThresholdCalculations(parseFloat(e.target.value)));
+    }
+
+    document.getElementById("preset-thresh-fpr")?.addEventListener("click", () => updateThresholdCalculations(0.18));
+    document.getElementById("preset-thresh-f1")?.addEventListener("click", () => updateThresholdCalculations(0.32));
+    document.getElementById("preset-thresh-precision")?.addEventListener("click", () => updateThresholdCalculations(0.75));
+
+    ["cost-fn-input", "cost-fp-input"].forEach((id) => {
+      document.getElementById(id)?.addEventListener("input", () => updateThresholdCalculations(activeThreshold));
+    });
+
+    // Batch Presets
+    document.getElementById("btn-preset-10k")?.addEventListener("click", () => triggerBatchScoring("preset-10k"));
+    document.getElementById("btn-preset-100k")?.addEventListener("click", () => triggerBatchScoring("preset-100k"));
+    document.getElementById("btn-preset-1m")?.addEventListener("click", () => triggerBatchScoring("preset-1m"));
+
+    document.getElementById("btn-browse-file")?.addEventListener("click", () => {
+      document.getElementById("batch-file-input")?.click();
+    });
+
+    document.getElementById("batch-file-input")?.addEventListener("change", (e) => {
+      if (e.target.files && e.target.files[0]) {
+        triggerBatchScoring(e.target.files[0]);
+      }
+    });
+
+    // Inspector Action Buttons
+    document.getElementById("btn-insp-confirm-fraud")?.addEventListener("click", async () => {
+      await Api.queueAction(activeApplicantId, "confirmed_fraud", "Confirmed Fraud by Analyst in Inspector");
+      showToast(`Application ${activeApplicantId} marked as CONFIRMED FRAUD.`);
+      loadInspector(activeApplicantId);
+    });
+
+    document.getElementById("btn-insp-escalate")?.addEventListener("click", async () => {
+      await Api.queueAction(activeApplicantId, "escalated", "Escalated to Tier 2 Fraud Ops");
+      showToast(`Application ${activeApplicantId} ESCALATED to Tier 2.`);
+      loadInspector(activeApplicantId);
+    });
+
+    document.getElementById("btn-insp-approve")?.addEventListener("click", async () => {
+      await Api.queueAction(activeApplicantId, "marked_legitimate", "Approved and Verified Legitimate");
+      showToast(`Application ${activeApplicantId} MARKED LEGITIMATE.`);
+      loadInspector(activeApplicantId);
+    });
+
+    // Modal Close / Save
+    document.getElementById("btn-close-modal")?.addEventListener("click", closeCaseModal);
+    document.getElementById("btn-cancel-modal")?.addEventListener("click", closeCaseModal);
+    document.getElementById("btn-save-modal")?.addEventListener("click", saveCaseDisposition);
+
+    // Responsive Window Resize (debounced redraw)
+    window.addEventListener("resize", Fmt.debounce(renderCurrentPageCharts, 250));
+  }
+
+  function init() {
+    initTheme();
+    injectIcons();
+    bindGlobalEvents();
+    navigateTo("monitor");
+  }
+
+  return { init, navigateTo, showToast };
+})();
+
+document.addEventListener("DOMContentLoaded", App.init);

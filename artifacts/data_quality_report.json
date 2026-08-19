@@ -1,0 +1,120 @@
+{
+  "dataset_name": "Bank Account Fraud (BAF) - Base Variant (Feedzai NeurIPS 2022)",
+  "provenance": {
+    "source": "Kaggle sgpjesus/bank-account-fraud-dataset-neurips-2022",
+    "file_name": "Base.csv",
+    "file_size_mb": 203.54,
+    "sha256": "7bf10a37ce07e72e14c1b09e5efee3d27261baff4facc7da767b0474dcf9b809",
+    "derived_parquet": "data/Base.parquet"
+  },
+  "shape": {
+    "rows": 1000000,
+    "columns": 32
+  },
+  "target_analysis": {
+    "target_column": "fraud_bool",
+    "class_0_legitimate": 988971,
+    "class_1_fraud": 11029,
+    "fraud_prevalence_pct": 1.1029,
+    "imbalance_ratio": "89:1",
+    "is_real_label": true,
+    "fabricated_labels": false
+  },
+  "sentinel_missing_values": {
+    "prev_address_months_count": {
+      "sentinel_negative_count": 712920,
+      "sentinel_negative_pct": 71.29,
+      "min": -1.0,
+      "max": 383.0,
+      "mean_valid": 60.71996655984395
+    },
+    "current_address_months_count": {
+      "sentinel_negative_count": 4254,
+      "sentinel_negative_pct": 0.43,
+      "min": -1.0,
+      "max": 428.0,
+      "mean_valid": 86.96205759300062
+    },
+    "bank_months_count": {
+      "sentinel_negative_count": 253635,
+      "sentinel_negative_pct": 25.36,
+      "min": -1.0,
+      "max": 32.0,
+      "mean_valid": 14.862618155996062
+    },
+    "session_length_in_minutes": {
+      "sentinel_negative_count": 2015,
+      "sentinel_negative_pct": 0.2,
+      "min": -1.0,
+      "max": 85.89914319274027,
+      "mean_valid": 7.562193020225753
+    },
+    "device_distinct_emails_8w": {
+      "sentinel_negative_count": 359,
+      "sentinel_negative_pct": 0.04,
+      "min": -1.0,
+      "max": 2.0,
+      "mean_valid": 1.0190368342234861
+    },
+    "intended_balcon_amount": {
+      "sentinel_negative_count": 742523,
+      "sentinel_negative_pct": 74.25,
+      "min": -15.530554840076814,
+      "max": 112.9569276953714,
+      "mean_valid": 36.58249599376844
+    }
+  },
+  "constant_columns": [
+    "device_fraud_count"
+  ],
+  "temporal_drift": [
+    {
+      "month": 0,
+      "total_applications": 132440,
+      "fraud_applications": 1500,
+      "fraud_rate": 1.1326
+    },
+    {
+      "month": 1,
+      "total_applications": 127620,
+      "fraud_applications": 1198,
+      "fraud_rate": 0.9387
+    },
+    {
+      "month": 2,
+      "total_applications": 136979,
+      "fraud_applications": 1198,
+      "fraud_rate": 0.8746
+    },
+    {
+      "month": 3,
+      "total_applications": 150936,
+      "fraud_applications": 1392,
+      "fraud_rate": 0.9222
+    },
+    {
+      "month": 4,
+      "total_applications": 127691,
+      "fraud_applications": 1452,
+      "fraud_rate": 1.1371
+    },
+    {
+      "month": 5,
+      "total_applications": 119323,
+      "fraud_applications": 1411,
+      "fraud_rate": 1.1825
+    },
+    {
+      "month": 6,
+      "total_applications": 108168,
+      "fraud_applications": 1450,
+      "fraud_rate": 1.3405
+    },
+    {
+      "month": 7,
+      "total_applications": 96843,
+      "fraud_applications": 1428,
+      "fraud_rate": 1.4746
+    }
+  ]
+}

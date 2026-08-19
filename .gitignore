@@ -1,0 +1,47 @@
+# Large Raw and Processed Datasets
+data/Base.csv
+data/Base.parquet
+data/*.csv
+data/*.parquet
+
+# Virtual Environments
+.venv/
+venv/
+ENV/
+env/
+env.bak/
+venv.bak/
+
+# SQLite & Databases
+*.db
+*.sqlite
+*.sqlite3
+test_debug.db
+
+# Model Training & Boosting Temporary Dirs
+catboost_info/
+wandb/
+mlruns/
+lightning_logs/
+
+# Python Caches & Bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+.mypy_cache/
+.ruff_cache/
+
+# OS & IDE Files
+.DS_Store
+Thumbs.db
+.idea/
+.vscode/
+*.swp
+*~
+
+# Preserved Artifacts (Explicit whitelist safeguard)
+!artifacts/
+!artifacts/**

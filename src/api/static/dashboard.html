@@ -1,0 +1,727 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Bank Fraud Detection Enterprise Console</title>
+<style>
+  :root {
+    color-scheme: light dark;
+    --bg: #0b0f19;
+    --surface: #131826;
+    --surface-2: #1a2234;
+    --border: rgba(255, 255, 255, 0.10);
+    --border-strong: rgba(255, 255, 255, 0.18);
+    --text-primary: #f3f6fc;
+    --text-secondary: #a2adcb;
+    --muted: #727e9d;
+    --accent: #3b82f6;
+    --accent-hover: #2563eb;
+    --accent-wash: rgba(59, 130, 246, 0.15);
+    --good: #10b981;
+    --good-wash: rgba(16, 185, 129, 0.15);
+    --warning: #f59e0b;
+    --warning-wash: rgba(245, 158, 11, 0.15);
+    --critical: #ef4444;
+    --critical-wash: rgba(239, 68, 68, 0.15);
+    --shadow: 0 4px 20px -2px rgba(0, 0, 0, 0.5);
+  }
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    background: var(--bg);
+    color: var(--text-primary);
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+    line-height: 1.5;
+    padding-bottom: 60px;
+  }
+  header {
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
+    padding: 16px 24px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    position: sticky;
+    top: 0;
+    z-index: 100;
+  }
+  .brand { display: flex; align-items: center; gap: 12px; }
+  .brand .logo {
+    background: linear-gradient(135deg, #3b82f6, #8b5cf6);
+    color: #fff;
+    font-weight: 900;
+    font-size: 16px;
+    padding: 6px 12px;
+    border-radius: 8px;
+    letter-spacing: 0.05em;
+  }
+  .brand h1 { font-size: 18px; font-weight: 700; }
+  .brand .sub { font-size: 12px; color: var(--muted); }
+  .header-actions { display: flex; align-items: center; gap: 12px; }
+  .badge {
+    font-size: 11px;
+    font-weight: 700;
+    text-transform: uppercase;
+    padding: 4px 10px;
+    border-radius: 999px;
+    letter-spacing: 0.04em;
+  }
+  .badge.live { background: var(--good-wash); color: var(--good); border: 1px solid var(--good); }
+  
+  .container { max-width: 1280px; margin: 24px auto; padding: 0 20px; display: flex; flex-direction: column; gap: 24px; }
+  
+  /* Tabs */
+  .tabs { display: flex; gap: 8px; border-bottom: 1px solid var(--border); padding-bottom: 8px; }
+  .tab-btn {
+    background: transparent;
+    border: none;
+    color: var(--text-secondary);
+    font-size: 14px;
+    font-weight: 600;
+    padding: 8px 16px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .tab-btn.active {
+    background: var(--surface-2);
+    color: var(--text-primary);
+    border: 1px solid var(--border-strong);
+  }
+  
+  /* Stat Cards */
+  .stat-grid { display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; }
+  .stat-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 14px;
+    padding: 20px;
+    box-shadow: var(--shadow);
+  }
+  .stat-card .label { font-size: 12px; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; }
+  .stat-card .val { font-size: 28px; font-weight: 800; margin: 6px 0; color: var(--text-primary); }
+  .stat-card .desc { font-size: 12px; color: var(--text-secondary); }
+  
+  /* Layout Grid */
+  .grid-2 { display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 20px; }
+  @media (max-width: 900px) { .grid-2 { grid-template-columns: 1fr; } }
+  
+  .card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 16px;
+    padding: 24px;
+    box-shadow: var(--shadow);
+  }
+  .card-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 18px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid var(--border);
+  }
+  .card-header h2 { font-size: 16px; font-weight: 700; }
+  
+  /* Form inputs */
+  .form-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(170px, 1fr)); gap: 12px; }
+  .form-group { display: flex; flex-direction: column; gap: 4px; }
+  .form-group label { font-size: 11.5px; font-weight: 600; color: var(--text-secondary); }
+  .form-group input, .form-group select {
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    color: var(--text-primary);
+    border-radius: 8px;
+    padding: 8px 10px;
+    font-size: 13px;
+  }
+  .form-group input:focus, .form-group select:focus {
+    outline: 2px solid var(--accent);
+    border-color: transparent;
+  }
+  
+  .preset-row { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 16px; }
+  .btn {
+    background: var(--accent);
+    color: #fff;
+    border: none;
+    border-radius: 8px;
+    padding: 9px 16px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.15s;
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .btn:hover { background: var(--accent-hover); }
+  .btn.secondary { background: var(--surface-2); color: var(--text-primary); border: 1px solid var(--border-strong); }
+  .btn.secondary:hover { background: var(--border-strong); }
+  .btn.danger { background: var(--critical); }
+  .btn.danger:hover { background: #dc2626; }
+  .btn.success { background: var(--good); }
+  .btn.success:hover { background: #059669; }
+  .btn.small { padding: 5px 10px; font-size: 12px; }
+  
+  /* Prediction Outcome Display */
+  .result-box {
+    margin-top: 20px;
+    background: var(--surface-2);
+    border: 1px solid var(--border-strong);
+    border-radius: 12px;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+  }
+  .score-header { display: flex; align-items: baseline; justify-content: space-between; }
+  .score-number { font-size: 38px; font-weight: 900; letter-spacing: -0.02em; }
+  .score-number.low { color: var(--good); }
+  .score-number.medium { color: var(--warning); }
+  .score-number.critical { color: var(--critical); }
+  
+  .decision-pill {
+    padding: 6px 14px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 0.05em;
+  }
+  .decision-APPROVE { background: var(--good-wash); color: var(--good); border: 1px solid var(--good); }
+  .decision-REVIEW { background: var(--warning-wash); color: var(--warning); border: 1px solid var(--warning); }
+  .decision-BLOCK { background: var(--critical-wash); color: var(--critical); border: 1px solid var(--critical); }
+  
+  /* SHAP Drivers List */
+  .driver-list { display: flex; flex-direction: column; gap: 8px; }
+  .driver-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.2);
+    padding: 10px 12px;
+    border-radius: 8px;
+    font-size: 12.5px;
+  }
+  .driver-item.risk { border-left: 3px solid var(--critical); }
+  .driver-item.safe { border-left: 3px solid var(--good); }
+  
+  /* Tables */
+  table { width: 100%; border-collapse: collapse; font-size: 13px; margin-top: 10px; }
+  th { text-align: left; padding: 10px 12px; color: var(--muted); font-weight: 600; text-transform: uppercase; font-size: 11px; border-bottom: 1px solid var(--border); }
+  td { padding: 10px 12px; border-bottom: 1px solid var(--border); color: var(--text-secondary); }
+  tr:hover td { background: var(--surface-2); color: var(--text-primary); }
+  
+  .hidden { display: none !important; }
+</style>
+</head>
+<body>
+
+<header>
+  <div class="brand">
+    <div class="logo">BAF</div>
+    <div>
+      <h1>Bank Account Opening Fraud Detection</h1>
+      <div class="sub">Production Supervised Machine Learning API &bull; NeurIPS 2022 Benchmark</div>
+    </div>
+  </div>
+  <div class="header-actions">
+    <span class="badge live" id="live-indicator">&bull; API HEALTHY</span>
+    <a href="/docs" target="_blank" class="btn secondary small">OpenAPI Swagger Docs</a>
+  </div>
+</header>
+
+<div class="container">
+  
+  <!-- Stats Header -->
+  <div class="stat-grid">
+    <div class="stat-tile stat-card">
+      <div class="label">Champion Model</div>
+      <div class="val" id="model-name">LightGBM</div>
+      <div class="desc" id="model-metrics">ROC-AUC: 0.8985 &bull; PR-AUC: 0.1675</div>
+    </div>
+    <div class="stat-tile stat-card">
+      <div class="label">TPR @ 5% FPR</div>
+      <div class="val" style="color: var(--accent);">55.36%</div>
+      <div class="desc">NeurIPS Benchmark standard metric</div>
+    </div>
+    <div class="stat-tile stat-card">
+      <div class="label">Investigation Queue</div>
+      <div class="val" id="queue-count" style="color: var(--warning);">--</div>
+      <div class="desc">Active cases awaiting analyst review</div>
+    </div>
+    <div class="stat-tile stat-card">
+      <div class="label">AI Forensics Status</div>
+      <div class="val" id="ai-status" style="font-size: 20px; color: var(--good);">Ready</div>
+      <div class="desc">Nemotron + Deterministic Fallback</div>
+    </div>
+  </div>
+
+  <!-- Tabs Navigation -->
+  <div class="tabs">
+    <button class="tab-btn active" onclick="switchTab('tab-score')">Live Application Scorer</button>
+    <button class="tab-btn" onclick="switchTab('tab-queue')">Investigation Queue</button>
+    <button class="tab-btn" onclick="switchTab('tab-models')">Model Benchmark Comparison</button>
+  </div>
+
+  <!-- Tab 1: Live Scorer -->
+  <div id="tab-score" class="tab-content">
+    <div class="grid-2">
+      
+      <!-- Application Input Card -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Account Opening Application Input</h2>
+          <span class="sub" style="font-size: 12px; color: var(--muted);">31 Causal Attributes</span>
+        </div>
+
+        <div class="preset-row">
+          <span style="font-size: 12px; color: var(--muted); align-self: center;">Presets:</span>
+          <button class="btn secondary small" onclick="loadPreset('clean')">Clean Consumer</button>
+          <button class="btn secondary small" onclick="loadPreset('synthetic')">Synthetic Identity</button>
+          <button class="btn secondary small" onclick="loadPreset('mule')">Mule Velocity Spike</button>
+          <button class="btn secondary small" onclick="loadPreset('incoherent')">Financial Incoherence</button>
+        </div>
+
+        <form id="app-form">
+          <div class="form-grid">
+            <div class="form-group">
+              <label>Income Decile (0.1 - 0.9)</label>
+              <input type="number" id="f_income" step="0.1" min="0.1" max="0.9" value="0.7">
+            </div>
+            <div class="form-group">
+              <label>Name/Email Similarity (0-1)</label>
+              <input type="number" id="f_name_email_similarity" step="0.01" min="0" max="1" value="0.88">
+            </div>
+            <div class="form-group">
+              <label>Applicant Age (Decade)</label>
+              <input type="number" id="f_customer_age" step="10" min="10" max="90" value="40">
+            </div>
+            <div class="form-group">
+              <label>Prev Address Months (-1=none)</label>
+              <input type="number" id="f_prev_address_months_count" value="36">
+            </div>
+            <div class="form-group">
+              <label>Current Address Months</label>
+              <input type="number" id="f_current_address_months_count" value="48">
+            </div>
+            <div class="form-group">
+              <label>Bank Months (-1=none)</label>
+              <input type="number" id="f_bank_months_count" value="24">
+            </div>
+            <div class="form-group">
+              <label>Proposed Credit Limit ($)</label>
+              <input type="number" id="f_proposed_credit_limit" value="500">
+            </div>
+            <div class="form-group">
+              <label>Internal Credit Risk Score</label>
+              <input type="number" id="f_credit_risk_score" value="210">
+            </div>
+            <div class="form-group">
+              <label>Velocity 6h (Apps/hr)</label>
+              <input type="number" id="f_velocity_6h" value="3200">
+            </div>
+            <div class="form-group">
+              <label>Velocity 4w (Baseline)</label>
+              <input type="number" id="f_velocity_4w" value="3500">
+            </div>
+            <div class="form-group">
+              <label>DOB Distinct Emails 4w</label>
+              <input type="number" id="f_date_of_birth_distinct_emails_4w" value="1">
+            </div>
+            <div class="form-group">
+              <label>Housing Category</label>
+              <select id="f_housing_status">
+                <option value="BA">BA (Owner)</option>
+                <option value="BB">BB (Mortgage)</option>
+                <option value="BC" selected>BC (Tenant)</option>
+                <option value="BD">BD</option>
+                <option value="BE">BE</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Free Email Domain?</label>
+              <select id="f_email_is_free">
+                <option value="1">1 (Yes - Gmail/Yahoo)</option>
+                <option value="0">0 (No - Corporate/Custom)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Home Phone Valid</label>
+              <select id="f_phone_home_valid">
+                <option value="1">1 (Valid)</option>
+                <option value="0">0 (Invalid)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Mobile Phone Valid</label>
+              <select id="f_phone_mobile_valid">
+                <option value="1" selected>1 (Valid)</option>
+                <option value="0">0 (Invalid)</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Threshold Profile</label>
+              <select id="f_threshold_profile">
+                <option value="balanced" selected>Balanced (Cost Optimal)</option>
+                <option value="high_recall">High Recall (90%+ Capture)</option>
+                <option value="high_precision">High Precision (Min Alarms)</option>
+                <option value="top_5pct">Top 5% Alert Budget</option>
+                <option value="top_1pct">Top 1% Alert Budget</option>
+              </select>
+            </div>
+          </div>
+          
+          <div style="margin-top: 18px; display: flex; gap: 10px;">
+            <button type="button" class="btn" onclick="submitScoring()">Score Application</button>
+            <button type="button" class="btn secondary" onclick="submitExplain()">Explain with SHAP</button>
+            <button type="button" class="btn secondary" onclick="submitNemotron()">AI Forensic Briefing</button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Live Score & Forensic Results -->
+      <div class="card">
+        <div class="card-header">
+          <h2>Risk Assessment &amp; Forensic Output</h2>
+          <span id="scoring-latency" style="font-size: 12px; color: var(--muted);">-- ms</span>
+        </div>
+
+        <div id="empty-state" style="text-align: center; padding: 40px 20px; color: var(--muted);">
+          <p>Submit an application or click a preset above to generate real-time ML risk predictions and SHAP explainability attributions.</p>
+        </div>
+
+        <div id="result-display" class="hidden">
+          <div class="result-box">
+            <div class="score-header">
+              <div>
+                <div class="label" style="font-size: 11px; color: var(--muted); text-transform: uppercase;">Calibrated Fraud Probability</div>
+                <div id="score-val" class="score-number low">0.42%</div>
+              </div>
+              <div>
+                <span id="decision-badge" class="decision-pill decision-APPROVE">APPROVE</span>
+              </div>
+            </div>
+            <div style="font-size: 12.5px; color: var(--text-secondary);" id="risk-tier-text">
+              Risk Tier: <b>LOW</b> &bull; Threshold Applied: <b>1.50%</b> (balanced profile)
+            </div>
+          </div>
+
+          <div style="margin-top: 18px;">
+            <h3 style="font-size: 13px; font-weight: 700; margin-bottom: 10px; text-transform: uppercase; color: var(--muted);">Primary Risk &amp; Mitigating Drivers</h3>
+            <div class="driver-list" id="drivers-container"></div>
+          </div>
+
+          <div id="ai-forensic-box" class="hidden" style="margin-top: 18px; background: rgba(59, 130, 246, 0.08); border: 1px solid rgba(59, 130, 246, 0.25); border-radius: 12px; padding: 16px;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+              <h3 style="font-size: 13px; font-weight: 700; color: var(--accent);">AI Forensic Investigation Briefing</h3>
+              <span id="ai-provider-tag" style="font-size: 10px; background: var(--accent); color: #fff; padding: 2px 6px; border-radius: 4px;">NVIDIA Nemotron</span>
+            </div>
+            <p id="ai-summary" style="font-size: 13px; color: var(--text-primary); line-height: 1.5; margin-bottom: 10px;"></p>
+            <div id="ai-checklist" style="font-size: 12px; color: var(--text-secondary);"></div>
+          </div>
+        </div>
+
+      </div>
+
+    </div>
+  </div>
+
+  <!-- Tab 2: Queue -->
+  <div id="tab-queue" class="tab-content hidden">
+    <div class="card">
+      <div class="card-header">
+        <div>
+          <h2>Fraud Investigation Queue</h2>
+          <span class="sub" style="font-size: 12px; color: var(--muted);">Triage cases flagged by real-time model</span>
+        </div>
+        <div style="display: flex; gap: 10px;">
+          <a href="/api/queue/export" class="btn secondary small">Export to CSV</a>
+          <button class="btn small" onclick="loadQueue()">Refresh</button>
+        </div>
+      </div>
+
+      <table>
+        <thead>
+          <tr>
+            <th>Application ID</th>
+            <th>Fraud Probability</th>
+            <th>Risk Level</th>
+            <th>Decision</th>
+            <th>Status</th>
+            <th>Assigned To</th>
+            <th>Tags</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="queue-tbody">
+          <tr><td colspan="8" style="text-align:center; padding: 20px;">Loading queue...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Tab 3: Model Comparison -->
+  <div id="tab-models" class="tab-content hidden">
+    <div class="card">
+      <div class="card-header">
+        <h2>Benchmark Model Comparison (BAF Base Variant)</h2>
+        <span class="sub" style="font-size: 12px; color: var(--muted);">Temporal Holdout Validation (Months 6-7)</span>
+      </div>
+      <table>
+        <thead>
+          <tr>
+            <th>Model Architecture</th>
+            <th>Strategy</th>
+            <th>ROC-AUC</th>
+            <th>PR-AUC</th>
+            <th>TPR @ 5% FPR</th>
+            <th>F1 Score</th>
+            <th>Status</th>
+          </tr>
+        </thead>
+        <tbody id="models-tbody">
+          <tr><td colspan="7" style="text-align:center; padding: 20px;">Loading benchmarks...</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+  const API_BASE = "";
+
+  function switchTab(tabId) {
+    document.querySelectorAll('.tab-content').forEach(el => el.classList.add('hidden'));
+    document.querySelectorAll('.tab-btn').forEach(el => el.classList.remove('active'));
+    document.getElementById(tabId).classList.remove('hidden');
+    event.target.classList.add('active');
+    
+    if (tabId === 'tab-queue') loadQueue();
+    if (tabId === 'tab-models') loadModelComparison();
+  }
+
+  function getFormData() {
+    return {
+      income: parseFloat(document.getElementById('f_income').value),
+      name_email_similarity: parseFloat(document.getElementById('f_name_email_similarity').value),
+      customer_age: parseInt(document.getElementById('f_customer_age').value),
+      prev_address_months_count: parseFloat(document.getElementById('f_prev_address_months_count').value),
+      current_address_months_count: parseFloat(document.getElementById('f_current_address_months_count').value),
+      bank_months_count: parseFloat(document.getElementById('f_bank_months_count').value),
+      proposed_credit_limit: parseFloat(document.getElementById('f_proposed_credit_limit').value),
+      credit_risk_score: parseFloat(document.getElementById('f_credit_risk_score').value),
+      velocity_6h: parseFloat(document.getElementById('f_velocity_6h').value),
+      velocity_4w: parseFloat(document.getElementById('f_velocity_4w').value),
+      date_of_birth_distinct_emails_4w: parseFloat(document.getElementById('f_date_of_birth_distinct_emails_4w').value),
+      housing_status: document.getElementById('f_housing_status').value,
+      email_is_free: parseInt(document.getElementById('f_email_is_free').value),
+      phone_home_valid: parseInt(document.getElementById('f_phone_home_valid').value),
+      phone_mobile_valid: parseInt(document.getElementById('f_phone_mobile_valid').value),
+      threshold_profile: document.getElementById('f_threshold_profile').value,
+    };
+  }
+
+  function loadPreset(type) {
+    if (type === 'clean') {
+      document.getElementById('f_income').value = 0.8;
+      document.getElementById('f_name_email_similarity').value = 0.94;
+      document.getElementById('f_prev_address_months_count').value = 48;
+      document.getElementById('f_current_address_months_count').value = 72;
+      document.getElementById('f_bank_months_count').value = 36;
+      document.getElementById('f_proposed_credit_limit').value = 500;
+      document.getElementById('f_credit_risk_score').value = 260;
+      document.getElementById('f_velocity_6h').value = 3100;
+      document.getElementById('f_velocity_4w').value = 3500;
+      document.getElementById('f_date_of_birth_distinct_emails_4w').value = 1;
+      document.getElementById('f_housing_status').value = "BA";
+      document.getElementById('f_email_is_free').value = "0";
+      document.getElementById('f_phone_home_valid').value = "1";
+      document.getElementById('f_phone_mobile_valid').value = "1";
+    } else if (type === 'synthetic') {
+      document.getElementById('f_income').value = 0.2;
+      document.getElementById('f_name_email_similarity').value = 0.06;
+      document.getElementById('f_prev_address_months_count').value = -1;
+      document.getElementById('f_current_address_months_count').value = 2;
+      document.getElementById('f_bank_months_count').value = -1;
+      document.getElementById('f_proposed_credit_limit').value = 1800;
+      document.getElementById('f_credit_risk_score').value = -40;
+      document.getElementById('f_velocity_6h').value = 7500;
+      document.getElementById('f_velocity_4w').value = 4000;
+      document.getElementById('f_date_of_birth_distinct_emails_4w').value = 12;
+      document.getElementById('f_housing_status').value = "BC";
+      document.getElementById('f_email_is_free').value = "1";
+      document.getElementById('f_phone_home_valid').value = "0";
+      document.getElementById('f_phone_mobile_valid').value = "0";
+    } else if (type === 'mule') {
+      document.getElementById('f_velocity_6h').value = 14200;
+      document.getElementById('f_velocity_4w').value = 4100;
+      document.getElementById('f_date_of_birth_distinct_emails_4w').value = 8;
+      document.getElementById('f_proposed_credit_limit').value = 1500;
+      document.getElementById('f_prev_address_months_count').value = -1;
+    } else if (type === 'incoherent') {
+      document.getElementById('f_income').value = 0.1;
+      document.getElementById('f_proposed_credit_limit').value = 2000;
+      document.getElementById('f_credit_risk_score').value = -80;
+      document.getElementById('f_name_email_similarity').value = 0.2;
+    }
+    submitScoring();
+  }
+
+  async function submitScoring() {
+    const payload = getFormData();
+    const res = await fetch(API_BASE + '/api/predict', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    displayPrediction(data);
+  }
+
+  function displayPrediction(data) {
+    document.getElementById('empty-state').classList.add('hidden');
+    document.getElementById('result-display').classList.remove('hidden');
+    document.getElementById('scoring-latency').innerText = `${data.latency_ms} ms`;
+    
+    const probEl = document.getElementById('score-val');
+    probEl.innerText = (data.fraud_probability * 100).toFixed(2) + '%';
+    probEl.className = 'score-number ' + (data.fraud_probability > 0.08 ? 'critical' : data.fraud_probability > 0.015 ? 'medium' : 'low');
+    
+    const badgeEl = document.getElementById('decision-badge');
+    badgeEl.innerText = data.action;
+    badgeEl.className = `decision-pill decision-${data.action}`;
+    
+    document.getElementById('risk-tier-text').innerHTML = `Risk Tier: <b>${data.risk_level}</b> &bull; Decision Cutoff: <b>${(data.threshold_used * 100).toFixed(2)}%</b> (${data.threshold_profile} profile)`;
+    
+    const container = document.getElementById('drivers-container');
+    container.innerHTML = '';
+    if (data.top_risk_factors && data.top_risk_factors.length) {
+      data.top_risk_factors.forEach(f => {
+        const item = document.createElement('div');
+        item.className = `driver-item ${f.risk_impact === 'positive' ? 'risk' : 'safe'}`;
+        item.innerHTML = `<div><b>${f.signal_name}</b> <span style="color:var(--muted)">(${f.description})</span></div><div style="font-weight:700;">${f.risk_impact === 'positive' ? '+' : ''}${f.score_delta.toFixed(2)}</div>`;
+        container.appendChild(item);
+      });
+    } else {
+      container.innerHTML = '<div style="color:var(--muted); font-size:12px;">Standard behavioral telemetry. No critical anomalies flagged.</div>';
+    }
+  }
+
+  async function submitExplain() {
+    const payload = getFormData();
+    const res = await fetch(API_BASE + '/api/explain', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    
+    const container = document.getElementById('drivers-container');
+    container.innerHTML = '';
+    
+    data.top_positive_drivers.forEach(d => {
+      const item = document.createElement('div');
+      item.className = 'driver-item risk';
+      item.innerHTML = `<div><b>${d.feature_name_human}</b>: ${d.description}</div><div style="color:var(--critical); font-weight:800;">+${d.shap_value.toFixed(3)} (${d.contribution_pct}%)</div>`;
+      container.appendChild(item);
+    });
+
+    data.top_negative_drivers.forEach(d => {
+      const item = document.createElement('div');
+      item.className = 'driver-item safe';
+      item.innerHTML = `<div><b>${d.feature_name_human}</b>: ${d.description}</div><div style="color:var(--good); font-weight:800;">${d.shap_value.toFixed(3)} (${d.contribution_pct}%)</div>`;
+      container.appendChild(item);
+    });
+  }
+
+  async function submitNemotron() {
+    const payload = getFormData();
+    const res = await fetch(API_BASE + '/api/ai/analyze', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(payload)
+    });
+    const data = await res.json();
+    
+    const box = document.getElementById('ai-forensic-box');
+    box.classList.remove('hidden');
+    document.getElementById('ai-summary').innerText = data.executive_summary;
+    document.getElementById('ai-provider-tag').innerText = data.provider;
+    
+    const checkEl = document.getElementById('ai-checklist');
+    checkEl.innerHTML = '<b>Recommended Investigator Actions:</b><ul style="margin-top:4px; padding-left:18px;">' +
+      data.analyst_checklist.map(c => `<li>${c}</li>`).join('') + '</ul>';
+  }
+
+  async function loadQueue() {
+    const res = await fetch(API_BASE + '/api/queue');
+    const data = await res.json();
+    document.getElementById('queue-count').innerText = data.total;
+    
+    const tbody = document.getElementById('queue-tbody');
+    tbody.innerHTML = '';
+    
+    if (!data.items || !data.items.length) {
+      tbody.innerHTML = '<tr><td colspan="8" style="text-align:center; padding:20px;">Queue is clear. No pending investigation cases.</td></tr>';
+      return;
+    }
+
+    data.items.forEach(item => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:700;">${item.application_id}</td>
+        <td><b style="color:${item.fraud_probability > 0.08 ? 'var(--critical)' : 'var(--warning)'}">${(item.fraud_probability * 100).toFixed(2)}%</b></td>
+        <td><span class="badge ${item.risk_level === 'CRITICAL' ? 'decision-BLOCK' : 'decision-REVIEW'}">${item.risk_level}</span></td>
+        <td>${item.decision}</td>
+        <td><b>${item.status}</b></td>
+        <td>${item.assigned_to || 'Unassigned'}</td>
+        <td>${item.tags.join(', ')}</td>
+        <td>
+          <button class="btn secondary small" onclick="triageAction('${item.application_id}', 'Review')">Review</button>
+          <button class="btn secondary small" onclick="triageAction('${item.application_id}', 'Escalate')">Escalate</button>
+          <button class="btn success small" onclick="triageAction('${item.application_id}', 'Mark Legitimate')">Approve</button>
+          <button class="btn danger small" onclick="triageAction('${item.application_id}', 'Confirm Fraud')">Block</button>
+        </td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  async function triageAction(appId, action) {
+    await fetch(API_BASE + '/api/queue/action', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ application_id: appId, action: action, analyst_id: 'lead_investigator' })
+    });
+    loadQueue();
+  }
+
+  async function loadModelComparison() {
+    const res = await fetch(API_BASE + '/api/model-comparison');
+    const data = await res.json();
+    const tbody = document.getElementById('models-tbody');
+    tbody.innerHTML = '';
+    
+    data.models.forEach(m => {
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td style="font-weight:700;">${m.model_name}</td>
+        <td>${m.strategy}</td>
+        <td><b>${m.roc_auc.toFixed(4)}</b></td>
+        <td>${m.pr_auc.toFixed(4)}</td>
+        <td style="color:var(--accent); font-weight:700;">${(m.tpr_at_5pct_fpr * 100).toFixed(2)}%</td>
+        <td>${m.f1_score.toFixed(3)}</td>
+        <td><span class="badge ${m.production_status.includes('CHAMPION') ? 'decision-APPROVE' : 'decision-REVIEW'}">${m.production_status}</span></td>
+      `;
+      tbody.appendChild(tr);
+    });
+  }
+
+  // Initial load
+  loadQueue();
+</script>
+
+</body>
+</html>

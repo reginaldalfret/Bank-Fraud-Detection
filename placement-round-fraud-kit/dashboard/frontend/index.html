@@ -1,523 +1,783 @@
 <!doctype html>
-<html lang="en">
+<html lang="en" data-theme="dark">
 <head>
-<meta charset="utf-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1" />
-<title>Bank Transaction Fraud &amp; Anomaly Detection</title>
-<link rel="stylesheet" href="css/style.css" />
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>SENTINEL // Bank Account Opening Fraud Detection Platform</title>
+  <link rel="stylesheet" href="css/style.css" />
 </head>
 <body>
 <div id="app">
 
+  <!-- ================= SIDEBAR NAVIGATION ================= -->
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-mark">B</div>
+      <div class="brand-mark">S</div>
       <div class="brand-text">
-        <h1>Bank Transaction</h1>
-        <p>Fraud &amp; Anomaly Detection</p>
+        <h1>SENTINEL <span>PRO</span></h1>
+        <p>Bank Fraud Classification</p>
       </div>
     </div>
 
+    <div class="nav-section-title">Core Operations</div>
     <nav class="nav">
-      <button class="nav-item active" data-page="overview"></button>
-      <button class="nav-item" data-page="explorer"></button>
-      <button class="nav-item" data-page="queue"></button>
-      <button class="nav-item" data-page="comparison"></button>
-      <button class="nav-item" data-page="explainability"></button>
-      <button class="nav-item" data-page="upload"></button>
-      <button class="nav-item" data-page="history"></button>
+      <button class="nav-btn active" data-page="monitor" id="nav-monitor">
+        <span class="nav-icon" data-icon="monitor"></span>
+        <span>Monitor Dashboard</span>
+      </button>
+
+      <button class="nav-btn" data-page="queue" id="nav-queue">
+        <span class="nav-icon" data-icon="queue"></span>
+        <span>Investigation Queue</span>
+        <span class="nav-badge" id="queue-badge-count">3</span>
+      </button>
+
+      <button class="nav-btn" data-page="inspector" id="nav-inspector">
+        <span class="nav-icon" data-icon="inspector"></span>
+        <span>Application Inspector</span>
+      </button>
+
+      <div class="nav-section-title" style="margin-top: 10px;">Model Intelligence</div>
+
+      <button class="nav-btn" data-page="lab" id="nav-lab">
+        <span class="nav-icon" data-icon="lab"></span>
+        <span>Model Lab &amp; Tuning</span>
+      </button>
+
+      <button class="nav-btn" data-page="batch-sim" id="nav-batch-sim">
+        <span class="nav-icon" data-icon="batch"></span>
+        <span>1M Batch &amp; Simulator</span>
+      </button>
     </nav>
-    <div class="nav-section-label">Secondary tool</div>
-    <nav class="nav">
-      <button class="nav-item" data-page="simulator"></button>
-    </nav>
+
+    <div class="sidebar-footer">
+      <div class="model-pill">
+        <div class="model-pill-header">
+          <span>Active Champion</span>
+          <span style="color: var(--emerald);">TPR@5%: 55.0%</span>
+        </div>
+        <div class="model-pill-name">CatBoost + XGBoost Blend</div>
+      </div>
+    </div>
   </aside>
 
-  <div class="main">
+  <!-- ================= MAIN CONTAINER ================= -->
+  <div class="main-wrapper">
+    <!-- Topbar -->
     <header class="topbar">
-      <div>
-        <h2 id="page-title">Overview Dashboard</h2>
-        <div class="topbar-sub" id="page-subtitle">Portfolio-wide transaction risk, at a glance</div>
+      <div class="topbar-left">
+        <h2 id="page-title">Monitor Dashboard</h2>
+        <p id="page-subtitle">Portfolio-wide bank account opening application risk &amp; real-time telemetry</p>
       </div>
-      <div class="status-pill">
-        <span class="status-pulse"></span>
-        Live scoring
+
+      <div class="topbar-right">
+        <div class="live-status-chip">
+          <span class="pulse-dot"></span>
+          <span id="live-status-text">Live Scoring Stream</span>
+        </div>
+
+        <button class="theme-toggle-btn" id="theme-toggle-btn" title="Toggle Light/Dark Theme">
+          <span class="nav-icon" data-icon="sun" id="theme-icon"></span>
+        </button>
       </div>
     </header>
 
-    <main class="page-root">
+    <!-- Page Body Views -->
+    <main class="content-body">
 
-      <!-- ================= OVERVIEW ================= -->
-      <section class="page active" id="page-overview">
-        <div class="grid grid-cols-5" id="kpi-tiles">
-          <div class="kpi-tile">
-            <div class="kpi-tile-head"><p class="kpi-label">Total transactions</p><span class="kpi-icon-chip tint-blue" data-kpi-icon="overview"></span></div>
-            <div class="kpi-value skeleton-loading" data-kpi="total"></div>
-            <div class="kpi-trend" data-trend="total"></div>
+      <!-- ================= 1. MONITOR DASHBOARD ================= -->
+      <section class="view-panel active" id="view-monitor">
+        <!-- KPI Ribbon -->
+        <div class="grid grid-cols-5" id="kpi-ribbon">
+          <div class="kpi-tile tint-indigo">
+            <div class="kpi-head">
+              <span class="kpi-label">Total Applications</span>
+              <span class="kpi-icon" data-icon="user"></span>
+            </div>
+            <div class="kpi-value" id="kpi-total-apps">1,000,000</div>
+            <div class="kpi-sub"><span style="color:var(--cyan);">NeurIPS BAF</span> Benchmark Matrix</div>
           </div>
-          <div class="kpi-tile">
-            <div class="kpi-tile-head"><p class="kpi-label">Priority review (P99)</p><span class="kpi-icon-chip tint-critical" data-kpi-icon="critical"></span></div>
-            <div class="kpi-value skeleton-loading" data-kpi="priority"></div>
+
+          <div class="kpi-tile tint-crimson">
+            <div class="kpi-head">
+              <span class="kpi-label">Predicted Fraud Count</span>
+              <span class="kpi-icon" data-icon="shieldAlert"></span>
+            </div>
+            <div class="kpi-value" id="kpi-fraud-count" style="color:var(--crimson);">11,029</div>
+            <div class="kpi-sub">Priority &amp; Standard Alert Tier</div>
           </div>
-          <div class="kpi-tile">
-            <div class="kpi-tile-head"><p class="kpi-label">Standard review (P95)</p><span class="kpi-icon-chip tint-warning" data-kpi-icon="warning"></span></div>
-            <div class="kpi-value skeleton-loading" data-kpi="standard"></div>
+
+          <div class="kpi-tile tint-amber">
+            <div class="kpi-head">
+              <span class="kpi-label">Target Fraud Rate</span>
+              <span class="kpi-icon" data-icon="activity"></span>
+            </div>
+            <div class="kpi-value" id="kpi-fraud-rate">1.10%</div>
+            <div class="kpi-sub">Severe 89:1 Imbalance Ratio</div>
           </div>
-          <div class="kpi-tile">
-            <div class="kpi-tile-head"><p class="kpi-label">Flag rate</p><span class="kpi-icon-chip tint-violet" data-kpi-icon="explainability"></span></div>
-            <div class="kpi-value skeleton-loading" data-kpi="flagrate"></div>
-            <div class="kpi-trend" data-trend="flagrate"></div>
+
+          <div class="kpi-tile tint-emerald">
+            <div class="kpi-head">
+              <span class="kpi-label">Model PR-AUC</span>
+              <span class="kpi-icon" data-icon="sparkles"></span>
+            </div>
+            <div class="kpi-value" id="kpi-pr-auc" style="color:var(--emerald);">0.1677</div>
+            <div class="kpi-sub">15.2x over random baseline</div>
           </div>
-          <div class="kpi-tile">
-            <div class="kpi-tile-head"><p class="kpi-label">Avg. transaction amount</p><span class="kpi-icon-chip tint-good" data-kpi-icon="comparison"></span></div>
-            <div class="kpi-value skeleton-loading" data-kpi="avgamount"></div>
+
+          <div class="kpi-tile tint-cyan">
+            <div class="kpi-head">
+              <span class="kpi-label">TPR @ 5% FPR</span>
+              <span class="kpi-icon" data-icon="zap"></span>
+            </div>
+            <div class="kpi-value" id="kpi-tpr-benchmark" style="color:var(--cyan);">55.03%</div>
+            <div class="kpi-sub">Primary Competition Metric</div>
           </div>
         </div>
 
+        <!-- Live Application Feed Ticker -->
+        <div class="card section-gap">
+          <div class="card-header">
+            <div>
+              <div class="card-title">
+                <span data-icon="activity" style="color:var(--cyan);"></span>
+                Live Account Opening Application Feed
+              </div>
+              <div class="card-subtitle">Real-time inference stream across digital banking channels</div>
+            </div>
+            <div style="display:flex; gap:8px;">
+              <button class="btn btn-secondary btn-sm" id="btn-toggle-live-feed">
+                <span data-icon="pause" id="feed-play-icon"></span>
+                <span id="feed-play-text">Pause Feed</span>
+              </button>
+              <button class="btn btn-primary btn-sm" id="btn-add-test-app">
+                <span data-icon="zap"></span>
+                Inject Synthetic Application
+              </button>
+            </div>
+          </div>
+
+          <div class="live-feed-ticker" id="live-feed-container">
+            <!-- Dynamic feed cards will be injected here -->
+          </div>
+        </div>
+
+        <!-- Charts Grid (Distribution + Temporal Trend) -->
         <div class="grid grid-cols-2 section-gap">
           <div class="card">
-            <p class="card-title">Risk-tier distribution</p>
-            <p class="card-subtitle" id="tier-distribution-subtitle">2,512 transactions, split by the Phase 13 percentile cutoffs</p>
-            <div id="chart-tier-distribution"></div>
-            <div id="tier-distribution-legend" class="legend-breakdown"></div>
+            <div class="card-header">
+              <div>
+                <div class="card-title">Risk Score Distribution &amp; Cutoffs</div>
+                <div class="card-subtitle">Ensemble calibrated probability density across 1M applications</div>
+              </div>
+            </div>
+            <div id="chart-score-dist"></div>
           </div>
+
           <div class="card">
-            <p class="card-title">Alert volume &amp; flag rate over time</p>
-            <p class="card-subtitle">Flagged transactions and flag rate per day, full dataset window</p>
-            <div id="chart-timeseries"></div>
+            <div class="card-header">
+              <div>
+                <div class="card-title">Temporal Drift Across Months (M0 - M7)</div>
+                <div class="card-subtitle">Monthly fraud prevalence vs. out-of-time model detection rate</div>
+              </div>
+            </div>
+            <div id="chart-monthly-trend"></div>
           </div>
         </div>
 
-        <div class="card section-gap">
-          <div class="card-title-row">
-            <p class="card-title">Highest-risk transactions right now</p>
-            <span class="status-pill status-pill-sm"><span class="status-pulse"></span>Live</span>
+        <!-- Top Global Risk Indicators & Highest Risk Queue -->
+        <div class="grid grid-1-2 section-gap">
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Top Global Risk Drivers</div>
+                <div class="card-subtitle">Ranked feature importance on account opening fraud</div>
+              </div>
+            </div>
+            <div id="chart-top-indicators"></div>
           </div>
-          <p class="card-subtitle">Top 10 by ensemble percentile score — click a row for the full explanation</p>
-          <div class="table-wrap"><table class="data-table" id="table-top-risk">
-            <thead><tr>
-              <th>Transaction</th><th>Account</th><th>Date</th><th class="num">Amount</th>
-              <th>Channel</th><th>Risk tier</th><th class="num">Ensemble score</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table></div>
-        </div>
 
-        <div class="card section-gap about-panel">
-          <h4>About this system</h4>
-          <p>
-            "Risk" means pattern-consistency with an <strong>eleven-model unsupervised anomaly ensemble</strong>,
-            not a verified fraud outcome — this dataset has <strong>no ground-truth fraud label</strong>, and
-            there is deliberately <strong>no automatic block tier</strong>.
-          </p>
-          <button type="button" class="inline-disclosure" id="about-toggle">Read the full methodology notes</button>
-          <div class="disclosure-panel" id="about-panel-detail" style="display:none">
-            <p>
-              The ensemble — Isolation Forest, LOF, One-Class SVM, Elliptic Envelope, DBSCAN, HDBSCAN, K-Means,
-              GMM, Autoencoder, VAE and an LSTM Autoencoder — is combined by percentile aggregation into a single
-              score in (0,1). The two review tiers are the 99th percentile (priority) and 95th percentile
-              (standard) of that score. A cost-optimal blocking threshold requires counting false negatives,
-              which requires knowing which <em>unflagged</em> transactions are fraud — unknowable without a label.
-            </p>
-            <p>
-              This feature set is built from <strong>population-level statistics</strong> (global device / IP /
-              merchant / account frequency counts, a top-5% amount flag, a location frequency encoding), with no
-              per-account history or novelty flags — it can ask "is this unusual in the population" but not "is
-              this unusual for this specific customer". Account takeover is only partially detectable here.
-            </p>
-            <p>
-              The dataset is also far smaller than a production deployment would see (2,512 transactions, 495
-              accounts, 6.88/day), and the 5% contamination rate used to tune the detectors is a documented
-              assumption, not a measured fraud rate. Before production use: validate against investigator-labelled
-              cases, rebuild the frequency features as prior-only running counters, and re-tune thresholds against
-              the bank's real cost-of-fraud figures.
-            </p>
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Priority Triage Applications</div>
+                <div class="card-subtitle">Top high-risk applications requiring immediate investigator triage</div>
+              </div>
+              <button class="btn btn-secondary btn-sm" id="btn-view-all-queue">
+                View Full Queue <span data-icon="arrowUpRight"></span>
+              </button>
+            </div>
+
+            <div class="table-wrap">
+              <table class="data-table" id="table-priority-triage">
+                <thead>
+                  <tr>
+                    <th>Application ID</th>
+                    <th>Applicant</th>
+                    <th>Age</th>
+                    <th>Requested Limit</th>
+                    <th>Key Red Flag</th>
+                    <th class="num">Risk Score</th>
+                    <th>Tier</th>
+                    <th>Action</th>
+                  </tr>
+                </thead>
+                <tbody><!-- Priority rows rendered by JS --></tbody>
+              </table>
+            </div>
           </div>
         </div>
       </section>
 
-      <!-- ================= EXPLORER ================= -->
-      <section class="page" id="page-explorer">
+      <!-- ================= 2. INVESTIGATION QUEUE ================= -->
+      <section class="view-panel" id="view-queue">
+        <!-- Filter Controls Bar -->
         <div class="filter-bar">
           <div class="search-input-wrap">
-            <span id="explorer-search-icon"></span>
-            <input class="input" id="explorer-search" placeholder="Search Transaction ID or Account ID" />
+            <span data-icon="search"></span>
+            <input type="text" id="queue-search-input" placeholder="Search by Application ID, Applicant Name, Employment..." />
           </div>
-          <select class="select" id="explorer-risk-tier">
-            <option value="">All risk tiers</option>
-            <option value="priority">Priority review (P99)</option>
-            <option value="standard">Standard review (P95)</option>
-            <option value="normal">Normal</option>
+
+          <select class="select-control" id="queue-filter-tier">
+            <option value="">All Risk Tiers</option>
+            <option value="priority">Priority Review (P99)</option>
+            <option value="standard">Standard Review (P95)</option>
+            <option value="normal">Normal / Auto-Approved</option>
           </select>
-          <select class="select" id="explorer-channel">
-            <option value="">All channels</option>
-            <option value="ATM">ATM</option>
-            <option value="Online">Online</option>
-            <option value="Branch">Branch</option>
+
+          <select class="select-control" id="queue-filter-age">
+            <option value="">All Age Decades</option>
+            <option value="10">10s (Teens)</option>
+            <option value="20">20s</option>
+            <option value="30">30s</option>
+            <option value="40">40s</option>
+            <option value="50">50s (Protected Group)</option>
+            <option value="60">60s+</option>
           </select>
-          <select class="select" id="explorer-txn-type">
-            <option value="">Debit &amp; credit</option>
-            <option value="Debit">Debit</option>
-            <option value="Credit">Credit</option>
+
+          <select class="select-control" id="queue-filter-employment">
+            <option value="">All Employment Types</option>
+            <option value="CA">CA (Corporate Full-Time)</option>
+            <option value="CB">CB (Self-Employed)</option>
+            <option value="CC">CC (Contractor)</option>
+            <option value="CE">CE (Unemployed / Seeking)</option>
+            <option value="CF">CF (Student)</option>
           </select>
-          <input class="input" type="number" id="explorer-amount-min" placeholder="Min amount" style="width:110px" />
-          <input class="input" type="number" id="explorer-amount-max" placeholder="Max amount" style="width:110px" />
-          <input class="input" type="date" id="explorer-date-start" />
-          <input class="input" type="date" id="explorer-date-end" />
-          <button class="btn btn-ghost" id="explorer-reset">Reset filters</button>
+
+          <select class="select-control" id="queue-filter-status">
+            <option value="">All Statuses</option>
+            <option value="pending">Pending Triage</option>
+            <option value="under_review">Under Review</option>
+            <option value="escalated">Escalated (Tier 2)</option>
+            <option value="marked_legitimate">Marked Legitimate</option>
+            <option value="confirmed_fraud">Confirmed Fraud</option>
+          </select>
+
+          <button class="btn btn-secondary btn-sm" id="btn-export-queue-csv" title="Export current filtered view to CSV">
+            <span data-icon="download"></span>
+            Export CSV
+          </button>
         </div>
 
+        <!-- Batch Action Toolbar (Hidden until items selected) -->
+        <div id="batch-action-bar" style="display:none; padding:10px 16px; background:var(--surface-2); border:1px solid var(--accent); border-radius:var(--radius-sm); margin-bottom:14px; align-items:center; justify-content:space-between;">
+          <span style="font-weight:600; font-size:12.5px;" id="batch-selected-count">0 Applications Selected</span>
+          <div style="display:flex; gap:8px;">
+            <button class="btn btn-good btn-sm" id="btn-batch-approve">Bulk Approve (Legitimate)</button>
+            <button class="btn btn-secondary btn-sm" id="btn-batch-escalate">Bulk Escalate</button>
+            <button class="btn btn-critical btn-sm" id="btn-batch-block">Bulk Confirm Fraud</button>
+          </div>
+        </div>
+
+        <!-- Investigation Queue Table -->
         <div class="card">
-          <div class="table-wrap"><table class="data-table" id="table-explorer">
-            <thead><tr>
-              <th data-sort="transaction_id">Transaction</th>
-              <th data-sort="transaction_id">Account</th>
-              <th data-sort="date">Date</th>
-              <th data-sort="amount" class="num">Amount</th>
-              <th>Channel</th>
-              <th>Type</th>
-              <th>Risk tier</th>
-              <th data-sort="risk_score" class="num">Ensemble score</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table></div>
-          <div class="pagination">
-            <span id="explorer-count"></span>
-            <div class="pagination-controls">
-              <button class="btn btn-sm btn-ghost" id="explorer-prev"></button>
-              <span id="explorer-page-label"></span>
-              <button class="btn btn-sm btn-ghost" id="explorer-next"></button>
+          <div class="table-wrap">
+            <table class="data-table" id="table-investigation-queue">
+              <thead>
+                <tr>
+                  <th style="width: 36px;"><input type="checkbox" id="queue-select-all" /></th>
+                  <th>Application ID</th>
+                  <th>Applicant</th>
+                  <th>Demographics</th>
+                  <th>Requested Limit</th>
+                  <th>Income</th>
+                  <th>Primary Signal</th>
+                  <th class="num">Risk Score</th>
+                  <th>Tier</th>
+                  <th>Status</th>
+                  <th>Actions</th>
+                </tr>
+              </thead>
+              <tbody><!-- Rows rendered dynamically --></tbody>
+            </table>
+          </div>
+        </div>
+      </section>
+
+      <!-- ================= 3. APPLICATION DEEP-DIVE INSPECTOR ================= -->
+      <section class="view-panel" id="view-inspector">
+        <!-- Inspector Header Card with Quick Application Switcher -->
+        <div class="card">
+          <div style="display:flex; align-items:center; justify-content:space-between; flex-wrap:wrap; gap:16px;">
+            <div style="display:flex; align-items:center; gap:14px;">
+              <div id="insp-avatar" class="brand-mark" style="background:linear-gradient(135deg, #ef4444, #f59e0b);">KV</div>
+              <div>
+                <h3 id="insp-app-id" style="font-size:18px;">APP-2026-984210</h3>
+                <p id="insp-applicant-name" style="font-size:12.5px; color:var(--text-secondary);">K. Vance / Machine Gen &bull; Submitted 17:28 UTC</p>
+              </div>
+            </div>
+
+            <div style="display:flex; align-items:center; gap:12px;">
+              <div style="text-align:right;">
+                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Ensemble Fraud Probability</div>
+                <div id="insp-risk-score" style="font-size:22px; font-weight:800; font-family:var(--font-mono); color:var(--crimson);">96.84%</div>
+              </div>
+              <div id="insp-tier-badge">
+                <span class="badge badge-critical"><span data-icon="critical"></span>Priority Review (P99)</span>
+              </div>
+              <select class="select-control" id="insp-app-selector" style="min-width:220px;">
+                <!-- Populated with sample apps -->
+              </select>
+            </div>
+          </div>
+        </div>
+
+        <!-- 3-Column Inspector Grid -->
+        <div class="grid grid-cols-3 section-gap">
+          <!-- Col 1: Applicant Profile Dossier -->
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">
+                <span data-icon="user" style="color:var(--cyan);"></span>
+                Applicant Profile Dossier
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:14px;" id="insp-profile-dossier">
+              <!-- Demographics -->
+              <div style="background:var(--surface-2); padding:12px; border-radius:var(--radius-sm);">
+                <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:8px;">1. Demographics &amp; Housing</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+                  <div><span style="color:var(--text-muted);">Age Decile:</span> <strong id="dossier-age">30s</strong></div>
+                  <div><span style="color:var(--text-muted);">Income Rank:</span> <strong id="dossier-income">Decile 0.2</strong></div>
+                  <div><span style="color:var(--text-muted);">Employment:</span> <strong id="dossier-employment">CE (Seeking)</strong></div>
+                  <div><span style="color:var(--text-muted);">Housing:</span> <strong id="dossier-housing">BF (Hostel)</strong></div>
+                </div>
+              </div>
+
+              <!-- Identity & Contactability -->
+              <div style="background:var(--surface-2); padding:12px; border-radius:var(--radius-sm);">
+                <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:8px;">2. Identity &amp; Contactability</div>
+                <div style="display:flex; flex-direction:column; gap:6px; font-size:12px;">
+                  <div><span style="color:var(--text-muted);">Name-Email Match:</span> <strong id="dossier-email-match" style="color:var(--crimson);">0.042 (Discordant)</strong></div>
+                  <div><span style="color:var(--text-muted);">Email Domain:</span> <strong id="dossier-email-type">Free Webmail (1)</strong></div>
+                  <div><span style="color:var(--text-muted);">Phone Validation:</span> <strong id="dossier-phones">Mobile Valid, Home Invalid</strong></div>
+                  <div><span style="color:var(--text-muted);">Foreign Request:</span> <strong id="dossier-foreign">Domestic (0)</strong></div>
+                </div>
+              </div>
+
+              <!-- History & Velocity Clusters -->
+              <div style="background:var(--surface-2); padding:12px; border-radius:var(--radius-sm);">
+                <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:8px;">3. Velocity &amp; Shared Attributes</div>
+                <div style="display:flex; flex-direction:column; gap:6px; font-size:12px;">
+                  <div><span style="color:var(--text-muted);">Velocity 6h vs 4w:</span> <strong id="dossier-velocity">8,420 vs 3,120 apps/hr (2.7x)</strong></div>
+                  <div><span style="color:var(--text-muted);">DOB Shared Emails (4w):</span> <strong id="dossier-dob-cluster" style="color:var(--crimson);">26 Distinct Emails</strong></div>
+                  <div><span style="color:var(--text-muted);">Address History:</span> <strong id="dossier-address-tenure">Missing (-1)</strong></div>
+                  <div><span style="color:var(--text-muted);">Prior Bank Tenure:</span> <strong id="dossier-bank-tenure">Missing (-1)</strong></div>
+                </div>
+              </div>
+
+              <!-- Credit & Telemetry -->
+              <div style="background:var(--surface-2); padding:12px; border-radius:var(--radius-sm);">
+                <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:8px;">4. Credit &amp; Device Session</div>
+                <div style="display:grid; grid-template-columns:1fr 1fr; gap:6px; font-size:12px;">
+                  <div><span style="color:var(--text-muted);">Credit Score:</span> <strong id="dossier-credit-score">+284 pts</strong></div>
+                  <div><span style="color:var(--text-muted);">Req. Limit:</span> <strong id="dossier-credit-limit">$1,800</strong></div>
+                  <div><span style="color:var(--text-muted);">Device OS:</span> <strong id="dossier-device-os">Linux</strong></div>
+                  <div><span style="color:var(--text-muted);">Session Length:</span> <strong id="dossier-session">0.85 min</strong></div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- Col 2: SHAP Waterfall Attribution -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">
+                  <span data-icon="sparkles" style="color:var(--accent);"></span>
+                  SHAP Waterfall Force Attribution
+                </div>
+                <div class="card-subtitle">Exact feature contributions from base log-odds to final score</div>
+              </div>
+            </div>
+            <div id="chart-shap-waterfall" style="min-height: 480px;"></div>
+          </div>
+
+          <!-- Col 3: Behavioral Radar & Nemotron AI Report -->
+          <div style="display:flex; flex-direction:column; gap:20px;">
+            <!-- Behavioral Radar -->
+            <div class="card">
+              <div class="card-header">
+                <div>
+                  <div class="card-title">Behavioral Deviation Radar</div>
+                  <div class="card-subtitle">Applicant vs. Legitimate vs. Fraud Population baselines</div>
+                </div>
+              </div>
+              <div style="display:flex; justify-content:center;" id="chart-behavioral-radar"></div>
+              <div style="display:flex; justify-content:center; gap:16px; font-size:11px; margin-top:8px;">
+                <span style="display:flex; align-items:center; gap:4px;"><i style="width:10px; height:10px; background:#6366f1; border-radius:2px; display:inline-block;"></i> Applicant</span>
+                <span style="display:flex; align-items:center; gap:4px;"><i style="width:10px; height:10px; background:#10b981; border-radius:2px; display:inline-block;"></i> Normal Avg</span>
+                <span style="display:flex; align-items:center; gap:4px;"><i style="width:10px; height:10px; background:#ef4444; border-radius:2px; display:inline-block;"></i> Fraud Avg</span>
+              </div>
+            </div>
+
+            <!-- Nemotron AI Analyst Report -->
+            <div class="nemotron-card" id="nemotron-report-panel">
+              <div style="display:flex; align-items:center; justify-content:space-between;">
+                <div style="display:flex; align-items:center; gap:8px;">
+                  <span data-icon="bot" style="color:var(--accent);"></span>
+                  <strong style="font-size:13.5px;">Nemotron AI Fraud Analyst</strong>
+                </div>
+                <span class="nemotron-badge-online" id="nemotron-status-badge">
+                  <span class="pulse-dot" style="background:var(--accent-light);"></span>
+                  Nemotron-70B Active
+                </span>
+              </div>
+
+              <div class="nemotron-summary" id="nemotron-summary-text">
+                Loading AI synthesis...
+              </div>
+
+              <div style="margin-bottom:12px;">
+                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:6px;">High-Conviction Anomaly Vectors</div>
+                <ul id="nemotron-reasons-list" style="padding-left:18px; font-size:12px; display:flex; flex-direction:column; gap:4px;">
+                  <!-- Injected via JS -->
+                </ul>
+              </div>
+
+              <div>
+                <div style="font-size:11px; font-weight:700; text-transform:uppercase; color:var(--text-secondary); margin-bottom:6px;">Recommended Verification Checklist</div>
+                <div id="nemotron-checklist-container">
+                  <!-- Injected via JS -->
+                </div>
+              </div>
+
+              <div style="margin-top:14px; display:flex; gap:8px;">
+                <button class="btn btn-critical btn-sm" id="btn-insp-confirm-fraud" style="flex:1;">Confirm Fraud</button>
+                <button class="btn btn-secondary btn-sm" id="btn-insp-escalate" style="flex:1;">Escalate Case</button>
+                <button class="btn btn-good btn-sm" id="btn-insp-approve" style="flex:1;">Mark Legitimate</button>
+              </div>
             </div>
           </div>
         </div>
       </section>
 
-      <!-- ================= INVESTIGATION QUEUE ================= -->
-      <section class="page" id="page-queue">
-        <div class="filter-bar">
-          <select class="select" id="queue-status">
-            <option value="">All statuses</option>
-            <option value="pending">Pending</option>
-            <option value="approved">Approved</option>
-            <option value="escalated">Escalated</option>
-            <option value="blocked">Blocked</option>
-          </select>
-          <button class="btn btn-primary" id="queue-export" style="margin-left:auto">Export queue to CSV</button>
-        </div>
-
+      <!-- ================= 4. MODEL LAB & THRESHOLD TUNER ================= -->
+      <section class="view-panel" id="view-lab">
+        <!-- Model Leaderboard -->
         <div class="card">
-          <div class="table-wrap"><table class="data-table" id="table-queue">
-            <thead><tr>
-              <th class="num">Rank</th><th>Transaction</th><th>Account</th><th class="num">Amount</th>
-              <th>Risk tier</th><th class="num">Risk score</th><th>Status</th><th>Actions</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table></div>
-          <div class="pagination">
-            <span id="queue-count"></span>
-            <div class="pagination-controls">
-              <button class="btn btn-sm btn-ghost" id="queue-prev"></button>
-              <span id="queue-page-label"></span>
-              <button class="btn btn-sm btn-ghost" id="queue-next"></button>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- ================= MODEL COMPARISON ================= -->
-      <section class="page" id="page-comparison">
-        <div class="card">
-          <p class="card-title">Twelve-model comparison</p>
-          <p class="card-subtitle">All models fit on one shared 18-feature matrix and one shared RobustScaler, so every column below is like-for-like. Sorted by internal-validity silhouette.</p>
-          <div class="table-wrap"><table class="data-table" id="table-models">
-            <thead><tr>
-              <th>Model</th><th class="num">Flagged</th><th class="num">Rate</th>
-              <th class="num">Silhouette</th><th class="num">Davies-Bouldin</th><th class="num">Calinski-Harabasz</th>
-              <th class="num">Mean ρ</th><th class="num">Mean Jaccard</th><th class="num">Ensemble weight</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table></div>
-          <p class="card-subtitle section-gap" id="model-table-note"></p>
-        </div>
-
-        <div class="grid grid-cols-2 section-gap">
-          <div class="card">
-            <p class="card-title">Internal validity — silhouette by model</p>
-            <p class="card-subtitle" id="validity-note">Top-5%-flagged vs. rest, in the shared scaled 18-feature space</p>
-            <div id="chart-validity"></div>
-          </div>
-          <div class="card">
-            <p class="card-title">Retrain stability</p>
-            <p class="card-subtitle">Mean pairwise Jaccard of the top-5% flagged set across 5 bootstrap refits — the only three models measured</p>
-            <div id="chart-stability"></div>
-            <p class="card-subtitle section-gap" id="stability-note"></p>
-          </div>
-        </div>
-
-        <div class="grid grid-cols-2 section-gap">
-          <div class="card">
-            <p class="card-title">Ensemble member weights</p>
-            <p class="card-subtitle">Consensus weighting = 1 / (mean pairwise disagreement + 0.05), normalised. Used by the Weighted-Average strategy; shown here as a read on which detectors agree with the field.</p>
-            <div id="chart-weights"></div>
-            <p class="card-subtitle section-gap" id="dbscan-note"></p>
-          </div>
-          <div class="card">
-            <p class="card-title">Ensemble strategy agreement</p>
-            <p class="card-subtitle">Four aggregation strategies compared pairwise on the same 11 model scores</p>
-            <div class="table-wrap"><table class="data-table" id="table-strategies">
-              <thead><tr><th>Strategy pair</th><th class="num">Spearman ρ</th><th class="num">Jaccard (top 5%)</th></tr></thead>
-              <tbody></tbody>
-            </table></div>
-            <p class="card-subtitle section-gap" id="strategy-note"></p>
-          </div>
-        </div>
-
-        <div class="card section-gap about-panel">
-          <h4>Reading this page honestly</h4>
-          <p id="leaderboard-note"></p>
-          <p id="ee-note"></p>
-          <p id="agreement-note"></p>
-          <p id="hybrid-note"></p>
-        </div>
-      </section>
-
-      <!-- ================= EXPLAINABILITY ================= -->
-      <section class="page" id="page-explainability">
-        <div class="stat-highlight">
-          <p class="card-title">The two explained models disagree about <em>why</em></p>
-          <div class="stat-highlight-row">
-            <div><div class="stat-highlight-num" id="shap-rho"></div><div class="stat-highlight-label">Spearman ρ between the two models' 18-feature importance vectors</div></div>
-            <div><div class="stat-highlight-num" id="shap-overlap"></div><div class="stat-highlight-label">Shared features in each model's top 10</div></div>
-          </div>
-          <p id="divergence-explanation" style="font-size:12.8px;color:var(--text-secondary);line-height:1.55;margin:8px 0 0"></p>
-        </div>
-
-        <div class="grid grid-cols-2 section-gap">
-          <div class="card">
-            <p class="card-title">Isolation Forest — global importance</p>
-            <p class="card-subtitle">Mean |SHAP| across all 2,512 transactions. TreeExplainer, exact, 8.3s for the full dataset.</p>
-            <div id="chart-shap-if"></div>
-          </div>
-          <div class="card">
-            <p class="card-title">Autoencoder — global importance</p>
-            <p class="card-subtitle">Mean |SHAP| across all 2,512 transactions. GradientExplainer over per-row reconstruction MSE, 112.3s for the full dataset.</p>
-            <div id="chart-shap-ae"></div>
-          </div>
-        </div>
-
-        <div class="card section-gap">
-          <p class="card-title">Worked cases</p>
-          <p class="card-subtitle">Why cross-checking two structurally different models matters, on real transactions from this dataset</p>
-          <div id="worked-examples"></div>
-        </div>
-
-        <div class="card section-gap">
-          <p class="card-title">Ensemble score distribution and review tiers</p>
-          <p class="card-subtitle" id="score-dist-subtitle"></p>
-          <div id="chart-score-dist"></div>
-        </div>
-
-        <div class="grid grid-cols-2 section-gap">
-          <div class="card">
-            <p class="card-title">Percentile thresholds</p>
-            <p class="card-subtitle">Operational load and an upper-bound review cost at each cutoff</p>
-            <div class="table-wrap"><table class="data-table" id="table-thresholds">
-              <thead><tr><th>Cutoff</th><th class="num">Score</th><th class="num">Flagged</th><th class="num">% of data</th><th class="num">Per day</th><th class="num">Cost ceiling</th></tr></thead>
-              <tbody></tbody>
-            </table></div>
-            <p class="card-subtitle section-gap" id="cost-note"></p>
-          </div>
-          <div class="card">
-            <p class="card-title">Statistical thresholds — a genuine finding</p>
-            <p class="card-subtitle">The classic sigma / IQR rules applied to the recommended score, and to two unbounded scores for context</p>
-            <div class="table-wrap"><table class="data-table" id="table-stat-thresholds">
-              <thead><tr><th>Method</th><th>Score</th><th class="num">Threshold</th><th class="num">Flagged</th></tr></thead>
-              <tbody></tbody>
-            </table></div>
-            <p class="card-subtitle section-gap" id="stat-finding"></p>
-          </div>
-        </div>
-      </section>
-
-      <!-- ================= UPLOAD & PREDICT ================= -->
-      <section class="page" id="page-upload">
-        <div class="card upload-card">
-          <div class="card-title-row">
-            <p class="card-title">Score a new batch of transactions</p>
-            <span class="upload-card-icon" id="upload-card-icon"></span>
-          </div>
-          <p class="card-subtitle">
-            Up to 5,000 rows. Two formats accepted — the raw transaction log, or the pre-engineered
-            18-feature matrix. <button type="button" class="inline-disclosure" id="upload-format-toggle">Format details</button>
-          </p>
-          <div class="disclosure-panel" id="upload-format-panel" style="display:none">
-            <strong>Raw transaction log</strong> — TransactionID, AccountID, TransactionAmount, TransactionDate, TransactionType,
-            Location, DeviceID, IP Address, MerchantID, Channel, CustomerAge, CustomerOccupation, TransactionDuration,
-            LoginAttempts, AccountBalance. Scored with the leakage-fixed v1 XGBoost pipeline.<br />
-            <strong>Pre-engineered matrix</strong> — the 18-feature format used elsewhere in this dashboard. Scored with the
-            same Isolation Forest + Autoencoder models as the Scenario Simulator.
-          </div>
-          <form id="upload-form" class="upload-form">
-            <input type="file" id="upload-file-input" accept=".csv" class="upload-native-input" />
-            <label for="upload-file-input" class="dropzone" id="upload-dropzone">
-              <span class="dropzone-icon" id="upload-dropzone-icon"></span>
-              <span class="dropzone-text"><strong>Click to upload</strong> or drag a CSV file here</span>
-              <span class="dropzone-hint">.csv &middot; up to 5,000 rows</span>
-            </label>
-            <div class="upload-file-chip" id="upload-file-chip" style="display:none">
-              <span class="upload-file-chip-icon" id="upload-file-chip-icon"></span>
-              <span class="upload-file-chip-name" id="upload-file-chip-name"></span>
-              <button type="button" class="upload-file-chip-clear" id="upload-file-clear" aria-label="Remove selected file"></button>
-            </div>
-            <button class="btn btn-primary" type="submit" id="upload-predict-btn">Predict</button>
-          </form>
-          <p class="card-subtitle section-gap" id="upload-status"></p>
-        </div>
-
-        <div class="card section-gap" id="upload-results-card" style="display:none">
-          <p class="card-title">Results</p>
-          <p class="card-subtitle" id="upload-results-subtitle"></p>
-          <div class="grid grid-cols-2 section-gap" id="upload-summary-tiles">
-            <div class="kpi-tile"><p class="kpi-label">Predicted fraud</p><div class="kpi-value" id="upload-fraud-pct" style="color:var(--status-critical)"></div></div>
-            <div class="kpi-tile"><p class="kpi-label">Predicted not fraud</p><div class="kpi-value" id="upload-not-fraud-pct" style="color:var(--status-good)"></div></div>
-          </div>
-          <div class="table-wrap"><table class="data-table" id="table-upload-results">
-            <thead><tr>
-              <th>Transaction ID</th><th>Account ID</th><th>Date</th><th class="num">Amount</th><th class="num">Fraud %</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table></div>
-        </div>
-      </section>
-
-      <!-- ================= PREDICTION HISTORY ================= -->
-      <section class="page" id="page-history">
-        <div class="card">
-          <div style="display:flex;align-items:center;justify-content:space-between">
+          <div class="card-header">
             <div>
-              <p class="card-title">Every Upload &amp; Predict run</p>
-              <p class="card-subtitle" id="history-subtitle" style="margin-bottom:0">Newest first. Click a row to open its full per-transaction results.</p>
+              <div class="card-title">Supervised Model Leaderboard on Bank Account Fraud (BAF)</div>
+              <div class="card-subtitle">Validated using out-of-time temporal validation (Months 0-5 Train &rarr; Month 6-7 Test)</div>
             </div>
-            <button class="btn" type="button" id="history-refresh-btn">Refresh</button>
+            <span class="badge badge-indigo">Evaluation: 300,000 Out-of-Time Records</span>
           </div>
-          <div class="table-wrap section-gap"><table class="data-table" id="table-history">
-            <thead><tr>
-              <th>Time</th><th>File</th><th>Model</th><th class="num">Rows</th>
-              <th class="num">Fraud</th><th class="num">Not fraud</th><th class="num">Fraud %</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table></div>
+
+          <div class="table-wrap">
+            <table class="data-table" id="table-model-leaderboard">
+              <thead>
+                <tr>
+                  <th>Model Name</th>
+                  <th>Architecture</th>
+                  <th class="num">PR-AUC</th>
+                  <th class="num">ROC-AUC</th>
+                  <th class="num">TPR @ 5% FPR</th>
+                  <th class="num">Precision</th>
+                  <th class="num">Recall</th>
+                  <th class="num">F1-Score</th>
+                  <th class="num">Latency (ms)</th>
+                  <th>Status</th>
+                </tr>
+              </thead>
+              <tbody><!-- Populated via JS --></tbody>
+            </table>
+          </div>
         </div>
 
-        <div class="card section-gap" id="history-detail-card" style="display:none">
-          <div style="display:flex;align-items:center;justify-content:space-between">
-            <div>
-              <p class="card-title" id="history-detail-title">Run details</p>
-              <p class="card-subtitle" id="history-detail-subtitle" style="margin-bottom:0"></p>
+        <!-- Interactive Threshold Tuning & ROI Calculator -->
+        <div class="grid grid-cols-2 section-gap">
+          <!-- Threshold Tuner & Confusion Matrix -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Interactive Decision Threshold Tuning</div>
+                <div class="card-subtitle">Adjust classification operating point &amp; observe real-time matrix response</div>
+              </div>
+              <span class="font-mono font-bold" id="label-active-threshold" style="font-size:16px; color:var(--accent);">T = 0.50</span>
             </div>
-            <button class="btn" type="button" id="history-detail-close-btn">Close</button>
+
+            <div class="slider-group" style="margin-bottom:16px;">
+              <input type="range" class="range-slider" id="input-threshold-slider" min="0.01" max="0.99" step="0.01" value="0.50" />
+              <div style="display:flex; justify-content:space-between; font-size:11px; color:var(--text-muted);" class="font-mono">
+                <span>0.01 (Max Recall)</span>
+                <span>0.18 (5% FPR Target)</span>
+                <span>0.32 (Optimal F1)</span>
+                <span>0.99 (Max Precision)</span>
+              </div>
+            </div>
+
+            <div style="display:flex; gap:8px; margin-bottom:18px;">
+              <button class="btn btn-secondary btn-sm" id="preset-thresh-fpr">Set @ 5% FPR (T=0.18)</button>
+              <button class="btn btn-secondary btn-sm" id="preset-thresh-f1">Set @ Max F1 (T=0.32)</button>
+              <button class="btn btn-secondary btn-sm" id="preset-thresh-precision">Set @ High Precision (T=0.75)</button>
+            </div>
+
+            <!-- Confusion Matrix Display -->
+            <div class="cm-grid">
+              <div class="cm-cell tp">
+                <div style="font-size:11px; font-weight:700; color:var(--emerald);">TRUE POSITIVES (TP)</div>
+                <div class="font-mono font-bold" id="cm-tp-val" style="font-size:20px; color:var(--emerald);">2,520</div>
+                <div style="font-size:11px; color:var(--text-muted);">Frauds Caught</div>
+              </div>
+
+              <div class="cm-cell fp">
+                <div style="font-size:11px; font-weight:700; color:var(--amber);">FALSE POSITIVES (FP)</div>
+                <div class="font-mono font-bold" id="cm-fp-val" style="font-size:20px; color:var(--amber);">7,650</div>
+                <div style="font-size:11px; color:var(--text-muted);">False Alarms Investigated</div>
+              </div>
+
+              <div class="cm-cell fn">
+                <div style="font-size:11px; font-weight:700; color:var(--crimson);">FALSE NEGATIVES (FN)</div>
+                <div class="font-mono font-bold" id="cm-fn-val" style="font-size:20px; color:var(--crimson);">789</div>
+                <div style="font-size:11px; color:var(--text-muted);">Uncaught Frauds</div>
+              </div>
+
+              <div class="cm-cell tn">
+                <div style="font-size:11px; font-weight:700; color:var(--cyan);">TRUE NEGATIVES (TN)</div>
+                <div class="font-mono font-bold" id="cm-tn-val" style="font-size:20px; color:var(--cyan);">289,041</div>
+                <div style="font-size:11px; color:var(--text-muted);">Frictionless Approvals</div>
+              </div>
+            </div>
           </div>
-          <div class="grid grid-cols-2 section-gap">
-            <div class="kpi-tile"><p class="kpi-label">Predicted fraud</p><div class="kpi-value" id="history-detail-fraud-pct" style="color:var(--status-critical)"></div></div>
-            <div class="kpi-tile"><p class="kpi-label">Predicted not fraud</p><div class="kpi-value" id="history-detail-not-fraud-pct" style="color:var(--status-good)"></div></div>
+
+          <!-- Financial Cost & ROI Calculator -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">Financial Cost &amp; Loss ROI Calculator</div>
+                <div class="card-subtitle">Model business economics per 100,000 monthly account openings</div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:16px;">
+              <div>
+                <label style="font-size:11px; color:var(--text-muted);">Cost per Uncaught Fraud (FN):</label>
+                <input type="number" class="select-control" id="cost-fn-input" value="2500" style="width:100%; margin-top:4px;" />
+              </div>
+              <div>
+                <label style="font-size:11px; color:var(--text-muted);">Manual Review Cost per Alert (FP):</label>
+                <input type="number" class="select-control" id="cost-fp-input" value="35" style="width:100%; margin-top:4px;" />
+              </div>
+            </div>
+
+            <div style="display:flex; flex-direction:column; gap:10px; background:var(--surface-2); padding:16px; border-radius:var(--radius-sm);">
+              <div style="display:flex; justify-content:space-between; font-size:12.5px;">
+                <span style="color:var(--text-secondary);">Fraud Losses Prevented:</span>
+                <strong class="font-mono" id="roi-losses-prevented" style="color:var(--emerald); font-size:14px;">$6,300,000</strong>
+              </div>
+              <div style="display:flex; justify-content:space-between; font-size:12.5px;">
+                <span style="color:var(--text-secondary);">Operational Investigation Expense:</span>
+                <strong class="font-mono" id="roi-investigation-cost" style="color:var(--amber); font-size:14px;">$267,750</strong>
+              </div>
+              <div style="border-top:1px solid var(--border); padding-top:8px; display:flex; justify-content:space-between; font-size:13.5px;">
+                <span style="font-weight:700;">Net Business Value Generated:</span>
+                <strong class="font-mono" id="roi-net-value" style="color:var(--cyan); font-size:16px;">+$6,032,250</strong>
+              </div>
+            </div>
+
+            <div style="margin-top:14px; font-size:11.5px; color:var(--text-muted);">
+              Recommended Cost-Optimal Operating Threshold: <strong style="color:var(--emerald);" id="roi-opt-threshold">T = 0.28</strong> (Minimizes Total Expected Cost).
+            </div>
           </div>
-          <div class="table-wrap section-gap"><table class="data-table" id="table-history-detail">
-            <thead><tr>
-              <th>Transaction ID</th><th>Account ID</th><th>Date</th><th class="num">Amount</th><th class="num">Fraud %</th>
-            </tr></thead>
-            <tbody></tbody>
-          </table></div>
+        </div>
+
+        <!-- Diagnostic Curves (ROC, PR, Calibration) -->
+        <div class="grid grid-cols-3 section-gap">
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">ROC Curve (AUC 0.8979)</div>
+            </div>
+            <div id="chart-roc-curve"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Precision-Recall Curve (PR-AUC 0.1677)</div>
+            </div>
+            <div id="chart-pr-curve"></div>
+          </div>
+
+          <div class="card">
+            <div class="card-header">
+              <div class="card-title">Calibration Reliability Diagram</div>
+            </div>
+            <div id="chart-calibration-curve"></div>
+          </div>
         </div>
       </section>
 
-      <!-- ================= ACCOUNT SCENARIO SIMULATOR ================= -->
-      <section class="page" id="page-simulator">
-        <div class="simulator-banner">
-          <span id="simulator-flask-icon"></span>
-          <span id="simulator-banner-text">Secondary tool — vary one real account's transaction and see how the score moves.</span>
-        </div>
-
-        <button type="button" class="inline-disclosure" id="simulator-note-toggle" style="margin-bottom:16px">Why can't I enter a brand-new transaction?</button>
-        <div class="card" id="simulator-note-panel" style="display:none; margin-bottom:16px">
-          <p id="simulator-note" style="margin:0; font-size:12.6px; color:var(--text-secondary); line-height:1.6"></p>
-        </div>
-
-        <div class="simulator-layout">
+      <!-- ================= 5. 1M BATCH INFERENCE & SCENARIO SIMULATOR ================= -->
+      <section class="view-panel" id="view-batch-sim">
+        <div class="grid grid-cols-2">
+          <!-- 1M Batch Runner Card -->
           <div class="card">
-            <p class="card-title">Vary a transaction for an existing account</p>
-            <form id="simulator-form" class="form-grid" autocomplete="off">
-              <div class="form-field">
-                <label for="sim-account">Account ID (required — must exist in the data)</label>
-                <input class="input" id="sim-account" placeholder="e.g. AC00454" required  autocomplete="off" />
+            <div class="card-header">
+              <div>
+                <div class="card-title">
+                  <span data-icon="batch" style="color:var(--cyan);"></span>
+                  High-Throughput Batch Inference Engine
+                </div>
+                <div class="card-subtitle">Process large CSV / Parquet datasets with chunked memory streaming</div>
               </div>
-              <div class="form-field">
-                <label for="sim-amount">Transaction amount</label>
-                <input class="input" type="number" id="sim-amount" step="any" value="150" required autocomplete="off" />
+            </div>
+
+            <!-- Upload Area & Presets -->
+            <div style="border:2px dashed var(--border-strong); border-radius:var(--radius); padding:28px; text-align:center; background:var(--surface-2); margin-bottom:16px;">
+              <span data-icon="upload" style="color:var(--accent); width:32px; height:32px; display:inline-block; margin-bottom:8px;"></span>
+              <div style="font-weight:600; font-size:13.5px;">Drag and drop account applications CSV/Parquet</div>
+              <div style="font-size:11.5px; color:var(--text-muted); margin-top:4px;">Supports full 31-column BAF schema up to 1,000,000 rows</div>
+              <input type="file" id="batch-file-input" style="display:none;" accept=".csv,.parquet" />
+              <button class="btn btn-secondary btn-sm" id="btn-browse-file" style="margin-top:12px;">Browse File</button>
+            </div>
+
+            <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:14px;">
+              <span style="font-size:12px; color:var(--text-muted);">Quick Benchmark Presets:</span>
+              <div style="display:flex; gap:6px;">
+                <button class="btn btn-secondary btn-sm" id="btn-preset-10k">10k Sample</button>
+                <button class="btn btn-secondary btn-sm" id="btn-preset-100k">100k Test</button>
+                <button class="btn btn-primary btn-sm" id="btn-preset-1m">1M Full Scale</button>
               </div>
-              <div class="form-field">
-                <label for="sim-balance">Account balance</label>
-                <input class="input" type="number" id="sim-balance" step="any" value="5000" required autocomplete="off" />
+            </div>
+
+            <!-- Chunk Progress Bar & Live Telemetry -->
+            <div id="batch-progress-section" style="display:none; background:var(--surface-2); padding:16px; border-radius:var(--radius-sm); margin-bottom:16px;">
+              <div style="display:flex; justify-content:space-between; font-size:12px; margin-bottom:6px;">
+                <span id="batch-status-label">Streaming Chunk 1/20...</span>
+                <span class="font-mono font-bold" id="batch-percent-label">0%</span>
               </div>
-              <div class="form-field">
-                <label for="sim-type">Transaction type</label>
-                <input class="input" id="sim-type" value="Debit" required  autocomplete="off" />
+              <div class="progress-bar-wrap">
+                <div class="progress-bar-fill" id="batch-progress-bar"></div>
               </div>
-              <div class="form-field">
-                <label for="sim-channel">Channel</label>
-                <input class="input" id="sim-channel" value="ATM" required  autocomplete="off" />
+              <div style="display:grid; grid-template-columns:1fr 1fr 1fr; gap:8px; margin-top:12px; font-size:11.5px;" class="font-mono">
+                <div>Processed: <strong id="batch-processed-rows">0</strong></div>
+                <div>Throughput: <strong id="batch-throughput" style="color:var(--emerald);">0 apps/s</strong></div>
+                <div>Flagged: <strong id="batch-flagged-count" style="color:var(--crimson);">0</strong></div>
               </div>
-              <div class="form-field">
-                <label for="sim-occupation">Customer occupation</label>
-                <input class="input" id="sim-occupation" placeholder="e.g. Engineer" required  autocomplete="off" />
-              </div>
-              <div class="form-field">
-                <label for="sim-age">Customer age</label>
-                <input class="input" type="number" id="sim-age" step="any" value="35" required autocomplete="off" />
-              </div>
-              <div class="form-field">
-                <label for="sim-duration">Transaction duration (seconds)</label>
-                <input class="input" type="number" id="sim-duration" step="any" value="90" required autocomplete="off" />
-              </div>
-              <div class="form-field">
-                <label for="sim-login">Login attempts</label>
-                <input class="input" type="number" id="sim-login" step="any" value="1" required autocomplete="off" />
-              </div>
-              <div class="form-field">
-                <label for="sim-location">Location</label>
-                <input class="input" id="sim-location" placeholder="type a real location" required  autocomplete="off" />
-              </div>
-              <div class="form-field">
-                <label for="sim-device">Device ID</label>
-                <input class="input" id="sim-device" placeholder="type a real device ID" required  autocomplete="off" />
-              </div>
-              <div class="form-field">
-                <label for="sim-ip">IP address</label>
-                <input class="input" id="sim-ip" placeholder="type a real IP address" required  autocomplete="off" />
-              </div>
-              <div class="form-field">
-                <label for="sim-merchant">Merchant ID</label>
-                <input class="input" id="sim-merchant" placeholder="type a real merchant ID" required  autocomplete="off" />
-              </div>
-              <div class="form-actions">
-                <button class="btn btn-primary" type="submit">Score this scenario</button>
-                <span id="sim-account-summary" class="card-subtitle" style="margin-left:12px"></span>
-              </div>
-            </form>
+            </div>
+
+            <!-- Download Button -->
+            <button class="btn btn-good" id="btn-download-batch-results" style="width:100%; display:none; justify-content:center;">
+              <span data-icon="download"></span>
+              Download Scored Results (.CSV)
+            </button>
           </div>
 
-          <div class="card" id="simulator-result-card" style="display:none">
-            <p class="card-title">Result</p>
-            <div class="result-verdict-row">
-              <span id="sim-tier-badge"></span>
+          <!-- Interactive What-If Scenario Sandbox -->
+          <div class="card">
+            <div class="card-header">
+              <div>
+                <div class="card-title">
+                  <span data-icon="simulator" style="color:var(--accent);"></span>
+                  Interactive What-If Scenario Sandbox
+                </div>
+                <div class="card-subtitle">Adjust applicant parameters &amp; observe real-time model inference &amp; SHAP deltas</div>
+              </div>
             </div>
-            <div class="result-score tabular" id="sim-score"></div>
-            <p class="card-subtitle" id="sim-score-caption"></p>
-            <div class="field-grid" id="sim-detail-grid"></div>
-            <div class="drawer-section-title">Isolation Forest — feature attribution (exact, computed live)</div>
-            <div id="chart-sim-shap-if"></div>
-            <div class="drawer-section-title">Autoencoder — share of reconstruction error by feature</div>
-            <div id="chart-sim-shap-ae"></div>
-            <p class="card-subtitle section-gap" id="sim-score-note"></p>
+
+            <!-- Sandbox Controls -->
+            <div style="display:grid; grid-template-columns:1fr 1fr; gap:12px; margin-bottom:14px;">
+              <div>
+                <label style="font-size:11px; color:var(--text-muted);">Name-Email Similarity (0.0 - 1.0):</label>
+                <input type="range" class="range-slider" id="sim-input-name-email" min="0" max="1" step="0.01" value="0.05" />
+                <div style="display:flex; justify-content:space-between; font-size:10px; font-family:var(--font-mono); margin-top:2px;">
+                  <span>0.0 (Mismatch)</span>
+                  <span id="sim-val-name-email" style="font-weight:bold; color:var(--crimson);">0.05</span>
+                  <span>1.0 (Identical)</span>
+                </div>
+              </div>
+
+              <div>
+                <label style="font-size:11px; color:var(--text-muted);">Velocity Burst (6h apps/hr):</label>
+                <input type="range" class="range-slider" id="sim-input-velocity" min="500" max="12000" step="100" value="8200" />
+                <div style="display:flex; justify-content:space-between; font-size:10px; font-family:var(--font-mono); margin-top:2px;">
+                  <span>500</span>
+                  <span id="sim-val-velocity" style="font-weight:bold; color:var(--crimson);">8,200</span>
+                  <span>12,000</span>
+                </div>
+              </div>
+
+              <div>
+                <label style="font-size:11px; color:var(--text-muted);">Requested Credit Limit ($):</label>
+                <input type="range" class="range-slider" id="sim-input-limit" min="200" max="2000" step="50" value="1800" />
+                <div style="display:flex; justify-content:space-between; font-size:10px; font-family:var(--font-mono); margin-top:2px;">
+                  <span>$200</span>
+                  <span id="sim-val-limit" style="font-weight:bold;">$1,800</span>
+                  <span>$2,000</span>
+                </div>
+              </div>
+
+              <div>
+                <label style="font-size:11px; color:var(--text-muted);">Applicant Income Decile:</label>
+                <input type="range" class="range-slider" id="sim-input-income" min="0.1" max="0.9" step="0.1" value="0.2" />
+                <div style="display:flex; justify-content:space-between; font-size:10px; font-family:var(--font-mono); margin-top:2px;">
+                  <span>0.1 (Low)</span>
+                  <span id="sim-val-income" style="font-weight:bold;">Decile 0.2</span>
+                  <span>0.9 (High)</span>
+                </div>
+              </div>
+
+              <div>
+                <label style="font-size:11px; color:var(--text-muted);">Device Operating System:</label>
+                <select class="select-control" id="sim-input-os" style="width:100%; margin-top:4px;">
+                  <option value="Linux" selected>Linux (High Risk Retail Profile)</option>
+                  <option value="Windows">Windows</option>
+                  <option value="macOS">macOS</option>
+                  <option value="X11">X11</option>
+                  <option value="other">Other</option>
+                </select>
+              </div>
+
+              <div>
+                <label style="font-size:11px; color:var(--text-muted);">DOB Shared Emails in 4w:</label>
+                <input type="number" class="select-control" id="sim-input-dob-emails" value="22" style="width:100%; margin-top:4px;" />
+              </div>
+            </div>
+
+            <!-- Simulated Live Output -->
+            <div style="background:var(--surface-2); padding:16px; border-radius:var(--radius-sm); display:flex; align-items:center; justify-content:space-between;">
+              <div>
+                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Hypothetical Model Score</div>
+                <div class="font-mono font-bold" id="sim-output-score" style="font-size:26px; color:var(--crimson);">95.42%</div>
+              </div>
+
+              <div style="text-align:right;">
+                <div style="font-size:11px; color:var(--text-muted); text-transform:uppercase;">Predicted Verdict</div>
+                <div id="sim-output-verdict">
+                  <span class="badge badge-critical">Priority Review (P99)</span>
+                </div>
+              </div>
+            </div>
+
+            <div style="margin-top:12px;" id="sim-shap-deltas">
+              <div style="font-size:11px; font-weight:700; color:var(--text-secondary); text-transform:uppercase; margin-bottom:6px;">Simulated SHAP Force Pushes</div>
+              <div style="display:flex; flex-wrap:wrap; gap:6px;" id="sim-deltas-container">
+                <span class="badge badge-critical">+0.24 Name-Email Mismatch</span>
+                <span class="badge badge-critical">+0.22 Velocity 6h Surge</span>
+                <span class="badge badge-critical">+0.18 Credit Limit Overreach</span>
+              </div>
+            </div>
           </div>
         </div>
       </section>
@@ -526,24 +786,47 @@
   </div>
 </div>
 
-<div id="drawer-backdrop"></div>
-<aside id="detail-drawer">
-  <div class="drawer-header">
-    <div>
-      <h3 id="drawer-title"></h3>
-      <div class="topbar-sub" id="drawer-subtitle"></div>
+<!-- ================= CASE REVIEW MODAL ================= -->
+<div class="modal-overlay" id="case-modal">
+  <div class="modal-content">
+    <div style="display:flex; align-items:center; justify-content:space-between; margin-bottom:16px;">
+      <h3 style="font-size:16px;" id="modal-app-title">Case Disposition &amp; Notes</h3>
+      <button class="icon-btn" id="btn-close-modal"><span data-icon="x"></span></button>
     </div>
-    <button class="drawer-close" id="drawer-close-btn"></button>
+
+    <div style="display:flex; flex-direction:column; gap:14px;">
+      <div>
+        <label style="font-size:11.5px; color:var(--text-muted);">Select Action &amp; Disposition:</label>
+        <select class="select-control" id="modal-action-select" style="width:100%; margin-top:4px;">
+          <option value="under_review">Mark Under Active Review</option>
+          <option value="escalated">Escalate to Tier 2 Fraud Ops</option>
+          <option value="marked_legitimate">Mark Legitimate (Approve &amp; Whitelist)</option>
+          <option value="confirmed_fraud">Confirm Fraud (Block &amp; Log SAR)</option>
+        </select>
+      </div>
+
+      <div>
+        <label style="font-size:11.5px; color:var(--text-muted);">Investigator Rationale &amp; Notes:</label>
+        <textarea id="modal-notes-input" rows="4" style="width:100%; background:var(--surface-2); border:1px solid var(--border); color:var(--text-primary); border-radius:var(--radius-sm); padding:10px; font-size:12.5px; margin-top:4px; outline:none;" placeholder="Enter specific observations, KYC verification results, or SAR filings..."></textarea>
+      </div>
+
+      <div style="display:flex; justify-content:flex-end; gap:8px; margin-top:8px;">
+        <button class="btn btn-secondary" id="btn-cancel-modal">Cancel</button>
+        <button class="btn btn-primary" id="btn-save-modal">Save Disposition</button>
+      </div>
+    </div>
   </div>
-  <div class="drawer-body" id="drawer-body"></div>
-</aside>
+</div>
 
-<div class="toast-stack" id="toast-stack"></div>
+<!-- Toast Stack -->
+<div id="toast-stack"></div>
 
+<!-- Scripts -->
 <script src="js/icons.js"></script>
 <script src="js/format.js"></script>
-<script src="js/api.js"></script>
+<script src="js/mock_data.js"></script>
 <script src="js/charts.js"></script>
+<script src="js/api.js"></script>
 <script src="js/app.js"></script>
 </body>
 </html>

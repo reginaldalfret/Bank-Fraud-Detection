@@ -1,0 +1,17 @@
+{
+  "dataset_rows": 1000000,
+  "scored_rows": 1000000,
+  "zero_dropped_rows": true,
+  "load_time_seconds": 0.16,
+  "feature_engineering_time_seconds": 1.09,
+  "model_inference_time_seconds": 3.44,
+  "calibration_time_seconds": 0.05,
+  "threshold_engine_time_seconds": 0.0,
+  "total_end_to_end_seconds": 4.85,
+  "production_throughput_rows_per_second": 206117.09,
+  "average_latency_ms_per_sample": 0.0049,
+  "peak_ram_mb": 718.44,
+  "cpu_utilization_percent": 34.2,
+  "flagged_fraud_count": 32433,
+  "flagged_fraud_rate": 0.0324
+}

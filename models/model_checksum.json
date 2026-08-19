@@ -1,0 +1,7 @@
+{
+  "final_model.joblib": "f7167f4494c31c5875fb63396f42428d8ffe5788df909bfcbf4aef42c710f681",
+  "preprocessor.joblib": "80dfac0ad9204d62280f1e1fa02499c2b864d667dfe5563425273a29213adee9",
+  "recorded_at_utc": "2026-08-19T12:49:08.643208+00:00",
+  "model_type": "logistic_regression",
+  "strategy": "class_weight"
+}

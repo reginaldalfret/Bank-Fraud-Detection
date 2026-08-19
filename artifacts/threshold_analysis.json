@@ -1,0 +1,132 @@
+{
+  "F1-Optimal": {
+    "frozen_threshold": 0.1388,
+    "validation_metrics": {
+      "val_fpr": 0.0133,
+      "val_tpr": 0.2814,
+      "val_precision": 0.2233,
+      "val_recall": 0.2814,
+      "val_f1": 0.249
+    },
+    "test_metrics": {
+      "test_fpr": 0.0085,
+      "test_tpr": 0.25,
+      "test_precision": 0.3046,
+      "test_recall": 0.25,
+      "test_f1": 0.2746,
+      "test_specificity": 0.9915,
+      "test_balanced_accuracy": 0.6207,
+      "tp": 357,
+      "fp": 815,
+      "tn": 94600,
+      "fn": 1071,
+      "detected_frauds": "357 / 1,428",
+      "false_alarms": "815 / 95,415",
+      "review_rate": 0.0121
+    }
+  },
+  "TPR @ 5% FPR Target": {
+    "frozen_threshold": 0.0592,
+    "validation_metrics": {
+      "val_fpr": 0.0354,
+      "val_tpr": 0.4462,
+      "val_precision": 0.1461,
+      "val_recall": 0.4462,
+      "val_f1": 0.2201
+    },
+    "test_metrics": {
+      "test_fpr": 0.0254,
+      "test_tpr": 0.4167,
+      "test_precision": 0.1973,
+      "test_recall": 0.4167,
+      "test_f1": 0.2678,
+      "test_specificity": 0.9746,
+      "test_balanced_accuracy": 0.6957,
+      "tp": 595,
+      "fp": 2420,
+      "tn": 92995,
+      "fn": 833,
+      "detected_frauds": "595 / 1,428",
+      "false_alarms": "2,420 / 95,415",
+      "review_rate": 0.0311
+    }
+  },
+  "High-Recall (\u226580%)": {
+    "frozen_threshold": 0.0125,
+    "validation_metrics": {
+      "val_fpr": 0.1888,
+      "val_tpr": 0.8152,
+      "val_precision": 0.0554,
+      "val_recall": 0.8152,
+      "val_f1": 0.1038
+    },
+    "test_metrics": {
+      "test_fpr": 0.1532,
+      "test_tpr": 0.771,
+      "test_precision": 0.07,
+      "test_recall": 0.771,
+      "test_f1": 0.1284,
+      "test_specificity": 0.8468,
+      "test_balanced_accuracy": 0.8089,
+      "tp": 1101,
+      "fp": 14619,
+      "tn": 80796,
+      "fn": 327,
+      "detected_frauds": "1,101 / 1,428",
+      "false_alarms": "14,619 / 95,415",
+      "review_rate": 0.1623
+    }
+  },
+  "High-Precision (\u226525%)": {
+    "frozen_threshold": 0.18,
+    "validation_metrics": {
+      "val_fpr": 0.0075,
+      "val_tpr": 0.2028,
+      "val_precision": 0.2687,
+      "val_recall": 0.2028,
+      "val_f1": 0.2311
+    },
+    "test_metrics": {
+      "test_fpr": 0.0048,
+      "test_tpr": 0.1646,
+      "test_precision": 0.3401,
+      "test_recall": 0.1646,
+      "test_f1": 0.2218,
+      "test_specificity": 0.9952,
+      "test_balanced_accuracy": 0.5799,
+      "tp": 235,
+      "fp": 456,
+      "tn": 94959,
+      "fn": 1193,
+      "detected_frauds": "235 / 1,428",
+      "false_alarms": "456 / 95,415",
+      "review_rate": 0.0071
+    }
+  },
+  "Top 1% Review Budget": {
+    "frozen_threshold": 0.18,
+    "validation_metrics": {
+      "val_fpr": 0.0075,
+      "val_tpr": 0.2028,
+      "val_precision": 0.2687,
+      "val_recall": 0.2028,
+      "val_f1": 0.2311
+    },
+    "test_metrics": {
+      "test_fpr": 0.0048,
+      "test_tpr": 0.1646,
+      "test_precision": 0.3401,
+      "test_recall": 0.1646,
+      "test_f1": 0.2218,
+      "test_specificity": 0.9952,
+      "test_balanced_accuracy": 0.5799,
+      "tp": 235,
+      "fp": 456,
+      "tn": 94959,
+      "fn": 1193,
+      "detected_frauds": "235 / 1,428",
+      "false_alarms": "456 / 95,415",
+      "review_rate": 0.0071
+    }
+  }
+}

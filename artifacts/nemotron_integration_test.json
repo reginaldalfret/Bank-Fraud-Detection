@@ -1,0 +1,10 @@
+{
+  "status": "NEMOTRON_RESILIENCE_VERIFIED",
+  "evidence_contract_verified": true,
+  "zero_crash_on_failure": true,
+  "modes_tested": {
+    "mode_1_deterministic_direct": "PASSED",
+    "mode_2_connection_refused": "PASSED",
+    "mode_3_fallback_structure": "PASSED"
+  }
+}
